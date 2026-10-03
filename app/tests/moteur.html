@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>JB Flow — Tests du moteur</title>
+<link rel="icon" type="image/png" href="../logo-32.png">
+<style>
+  :root { --bg: #F6F6F3; --card: #fff; --text: #11130F; --muted: #5A6156; --ok: #14924F; --bad: #C0392B; --line: #E3E7E0; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0B0C0A; --card: #151712; --text: #EDEFE9; --muted: #9AA394; --ok: #3DDC84; --bad: #FF6B5E; --line: #262A24; } }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 Inter, "Segoe UI", system-ui, sans-serif; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; gap: 12px; align-items: center; } header img { width: 40px; border-radius: 11px; }
+  h1 { font-size: 20px; margin: 0; } .sub { color: var(--muted); font-size: 13px; }
+  .sum { margin: 18px 0; padding: 12px 16px; border-radius: 12px; font-weight: 600; background: var(--card); border: 1px solid var(--line); }
+  .sum.ok { border-color: var(--ok); color: var(--ok); } .sum.bad { border-color: var(--bad); color: var(--bad); }
+  .t { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .t h2 { margin: 0 0 6px; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+  .t .st { font-size: 12px; padding: 1px 8px; border-radius: 99px; color: #fff; } .ok .st { background: var(--ok); } .bad .st { background: var(--bad); }
+  .t ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+  .t li.f { color: var(--bad); font-weight: 600; }
+  button { font: inherit; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><img src="../logo-192.png" alt=""><div><h1>Tests automatiques du moteur</h1><div class="sub">7 tests : apprentissage de l'agent (50 dossiers, 17 mois), saisonnalité, surcharges, planificateur, acomptes d'IS, tableaux de bord après la production, et simulation grandeur nature de 100 dossiers pendant 24 mois jour par jour (avec et sans réaffectations). Environ 10 secondes. Aucune donnée réelle n'est utilisée.</div></div></header>
+  <div id="sum" class="sum">Tests en cours…</div>
+  <div id="out"></div>
+  <button onclick="location.reload()">Relancer les tests</button>
+</div>
+<script src="../engine.js"></script>
+<script src="../fiscal.js"></script>
+<script src="suite.js"></script>
+<script>
+(function () {
+  const results = window.JBTestSuite(window.PlanEngine, window.JBFiscal);
+  const failed = results.filter(t => t.checks.some(c => !c.ok)).length;
+  document.getElementById('sum').className = 'sum ' + (failed ? 'bad' : 'ok');
+  document.getElementById('sum').textContent = failed ? '✗ ' + failed + ' test(s) en échec sur ' + results.length + ' — ne pas mettre en ligne' : '✓ ' + results.length + ' tests réussis — la version peut être mise en ligne';
+  document.getElementById('out').innerHTML = results.map(t => { const ok = t.checks.every(c => c.ok); return '<div class="t ' + (ok ? 'ok' : 'bad') + '"><h2><span class="st">' + (ok ? 'OK' : 'ÉCHEC') + '</span>' + t.name + '</h2><ul>' + t.checks.map(c => '<li class="' + (c.ok ? '' : 'f') + '">' + (c.ok ? '✓ ' : '✗ ') + c.label + '</li>').join('') + '</ul></div>'; }).join('');
+  window.JBTests = { results, failed };
+})();
+</script>
+</body>
+</html>

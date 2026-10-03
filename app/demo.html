@@ -1,0 +1,172 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>JB Flow Démo</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist:wght@400;500;600;700&display=swap">
+<script>/* Bac à sable JB Flow : ?role=collab|rc|manager choisit le profil fictif et lance la visite guidée */
+(function () { try { var r = new URLSearchParams(location.search).get('role'); var u = { collab: 'lea@demo.local', rc: 'hugo@demo.local', manager: 'admin@demo.local' }[r];
+  if (u && !sessionStorage.getItem('jbflow-sandbox-role')) { sessionStorage.setItem('jbflow-sandbox-role', r); sessionStorage.setItem('planif-demo-user', u); if (r === 'manager') sessionStorage.setItem('planif-view-as', 'manager'); localStorage.setItem('jbflow-tour-auto', '1'); location.hash = r === 'manager' ? '#/dashboard' : '#/today'; } } catch (e) { } })();</script>
+<script>document.documentElement.dataset.ui = "v2";
+  try { if (!sessionStorage.getItem('planif-demo-user')) sessionStorage.setItem('planif-view-as', 'manager'); sessionStorage.setItem('planif-demo-user', sessionStorage.getItem('planif-demo-user') || 'admin@demo.local'); var th = localStorage.getItem('planif-theme') || 'clair'; document.documentElement.dataset.theme = th === 'clair' || th === 'iris' ? 'clair' : 'signature'; if (th === 'nuit') document.documentElement.dataset.variant = 'aurora'; if (th === 'iris') document.documentElement.dataset.variant = 'iris'; var sd = localStorage.getItem('planif-side'); if ((sd === 'dark' || sd === 'color') && th !== 'iris') document.documentElement.dataset.side = sd; var ac = localStorage.getItem('planif-accent'); if (ac) document.documentElement.dataset.accent = ac; document.documentElement.dataset.motion = 'always'; } catch (e) { document.documentElement.dataset.theme = 'clair'; }
+</script>
+<link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="design-v2.css"><link rel="stylesheet" href="design-signature.css"><link rel="stylesheet" href="design-effects.css"><link rel="stylesheet" href="design-aurora.css"><link rel="stylesheet" href="design-clair.css"><link rel="stylesheet" href="design-iris.css"><link rel="stylesheet" href="design-motion.css">
+<div id="app"><div class="boot">Chargement de la démo…</div></div>
+<div id="sheet-root"></div>
+<div id="toasts" aria-live="polite"></div>
+<script>/* Démo : on se place autour du 15 du mois (milieu de production), un jour ouvré */ (function () { var n = new Date(), d = new Date(n.getFullYear(), n.getMonth(), 15, 12); if (d.getDay() === 6) d.setDate(14); if (d.getDay() === 0) d.setDate(16); window.JBFLOW_DEMO_TODAY = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();</script>
+
+<script src="config.js" charset="utf-8"></script>
+<script>/* Bac à sable : jamais de connexion à la base du cabinet, données fictives dans ce navigateur uniquement */ window.APP_CONFIG.SUPABASE_URL = ''; window.APP_CONFIG.SUPABASE_ANON_KEY = '';</script>
+<script src="engine.js" charset="utf-8"></script>
+<script src="fiscal.js" charset="utf-8"></script>
+<script src="store.js" charset="utf-8"></script>
+<script src="app.js" charset="utf-8"></script>
+<script src="ui-v2.js" charset="utf-8"></script>
+<script>
+/* Démo : jeu de données d'exemple (collaboratrice Léa, apprentie Inès, clients en retard de pièces), créé une seule fois dans ce navigateur */
+(function () {
+  var K = 'planif-tva-demo-v1';
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  setTimeout(function () {
+    try {
+      if (localStorage.getItem('jbflow-demo-seeded-v19')) return;
+      // ancienne démo déjà chargée dans ce navigateur : on repart d'une base vierge
+      if (localStorage.getItem('jbflow-demo-seeded') || localStorage.getItem('jbflow-demo-seeded-v2') || localStorage.getItem('jbflow-demo-seeded-v3') || localStorage.getItem('jbflow-demo-seeded-v4') || localStorage.getItem('jbflow-demo-seeded-v5') || localStorage.getItem('jbflow-demo-seeded-v6') || localStorage.getItem('jbflow-demo-seeded-v7') || localStorage.getItem('jbflow-demo-seeded-v8') || localStorage.getItem('jbflow-demo-seeded-v9') || localStorage.getItem('jbflow-demo-seeded-v10') || localStorage.getItem('jbflow-demo-seeded-v11') || localStorage.getItem('jbflow-demo-seeded-v12') || localStorage.getItem('jbflow-demo-seeded-v13') || localStorage.getItem('jbflow-demo-seeded-v14') || localStorage.getItem('jbflow-demo-seeded-v15') || localStorage.getItem('jbflow-demo-seeded-v16') || localStorage.getItem('jbflow-demo-seeded-v17') || localStorage.getItem('jbflow-demo-seeded-v18')) { localStorage.removeItem('jbflow-demo-seeded'); localStorage.removeItem('jbflow-demo-seeded-v2'); localStorage.removeItem('jbflow-demo-seeded-v3'); localStorage.removeItem('jbflow-demo-seeded-v4'); localStorage.removeItem('jbflow-demo-seeded-v5'); localStorage.removeItem('jbflow-demo-seeded-v6'); localStorage.removeItem('jbflow-demo-seeded-v7'); localStorage.removeItem('jbflow-demo-seeded-v8'); localStorage.removeItem('jbflow-demo-seeded-v9'); localStorage.removeItem('jbflow-demo-seeded-v10'); localStorage.removeItem('jbflow-demo-seeded-v11'); localStorage.removeItem('jbflow-demo-seeded-v12'); localStorage.removeItem('jbflow-demo-seeded-v13'); localStorage.removeItem('jbflow-demo-seeded-v14'); localStorage.removeItem('jbflow-demo-seeded-v15'); localStorage.removeItem('jbflow-demo-seeded-v16'); localStorage.removeItem('jbflow-demo-seeded-v17'); localStorage.removeItem('jbflow-demo-seeded-v18'); localStorage.removeItem('planif-tour-seen'); localStorage.removeItem(K); location.reload(); return; }
+      var db = JSON.parse(localStorage.getItem(K)); if (!db || !db.app_users || !db.app_users.length) return;
+      var adm = db.app_users[0], now = new Date(window.JBFLOW_DEMO_TODAY + 'T12:00:00'), m = iso(now).slice(0, 7), past = function (k) { var d = new Date(now); d.setDate(d.getDate() - k); return iso(d); };
+      var nm = new Date(now.getFullYear(), now.getMonth() + 1, 1), next = iso(nm).slice(0, 7);
+      localStorage.setItem('planif-theme-chosen:lea@demo.local', '1'); localStorage.setItem('planif-theme-chosen:admin@demo.local', '1');
+      db.app_users.push(Object.assign({}, adm, { id: 'u-eva', email: 'lea@demo.local', name: 'Léa Moreau', role: 'collab', collaborator_id: 'k-eva', active: true }));
+      db.collaborators.push({ id: 'k-eva', name: 'Léa', kind: 'collab', daily_capacity_min: 420, work_days: [1, 2, 3, 4, 5], active: true, version: 1, color: '#d946ef' });
+      var pres = []; for (var i = 0; i < 60; i++) { var d = new Date(now); d.setDate(d.getDate() + i); if ([1, 2, 3].indexOf(d.getDay()) >= 0) pres.push(iso(d)); }
+      db.collaborators.push({ id: 'k-chloe', name: 'Inès', kind: 'apprenti', tutor_id: null, presence_dates: pres, daily_capacity_min: 420, work_days: [1, 2, 3, 4, 5], active: true, version: 1, color: '#14b8a6' });
+      var late = [['BOULANGERIE DES TILLEULS', 9], ['GARAGE DU MOULIN', 8], ['ATELIER HORIZON', 7], ['CAFÉ DES ARTS', 6], ['PLOMBERIE MARTEAU', 4]];
+      late.forEach(function (r, i) {
+        var id = 'dc' + i;
+        db.clients.push({ id: id, name: r[0], collaborator_id: 'k-eva', frequency: 'mensuel', reception_day: 5, time_min: 60 + i * 30, vat_due_day: 21, vat_regime: 'ca3_mensuel', priority: 2, active: true, version: 1 });
+        db.productions.push({ id: 'dp' + i, client_id: id, month: m, expected_date: past(r[1]), nominal_date: past(r[1]), version: 1 });
+        db.tasks.push({ id: 'dt' + i, production_id: 'dp' + i, client_id: id, month: next, kind: 'production', collaborator_id: 'k-eva', planned_date: null, seq: i, duration_min: 60 + i * 30, due_date: next + '-21', locked: false, done: false, version: 1 });
+      });
+      // V27.00 : Léa surchargée le mois de production, Hugo disponible → réaffectations proposées (vue manager)
+      db.app_users.push(Object.assign({}, adm, { id: 'u-karim', email: 'hugo@demo.local', name: 'Hugo Lefèvre', role: 'collab', collaborator_id: 'k-karim', active: true })); localStorage.setItem('planif-theme-chosen:hugo@demo.local', '1');
+      db.collaborators.forEach(function (c) { if (c.id === 'k-eva') c.rc_id = 'k-karim'; });
+      db.collaborators.push({ id: 'k-karim', name: 'Hugo', kind: 'rc', daily_capacity_min: 420, work_days: [1, 2, 3, 4, 5], active: true, version: 1, color: '#0ea5e9' });
+      var pm = Number(iso(now).slice(8)) > 24 ? next : m, wdays = [];
+      for (var dd = new Date(pm + '-01T12:00:00'); iso(dd).slice(0, 7) === pm && iso(dd).slice(8) <= '24'; dd.setDate(dd.getDate() + 1)) if (dd.getDay() >= 1 && dd.getDay() <= 5 && iso(dd) > iso(now)) wdays.push(iso(dd));
+      var FZ = ['SAS EXEMPLE ALPHA', 'SARL BETA CONSEIL', 'GAMMA BÂTIMENT', 'DELTA TRANSPORTS', 'EPSILON DIGITAL', 'ZÊTA IMMOBILIER', 'ÊTA RESTAURATION', 'THÊTA SERVICES', 'IOTA COIFFURE', 'KAPPA INVEST', 'LAMBDA ÉVÉNEMENTS', 'MU PAYSAGES', 'NU TEXTILES', 'XI OPTIQUE', 'OMICRON SPORTS', 'PI MENUISERIE', 'RHÔ PRIMEURS', 'SIGMA SÉCURITÉ', 'TAU COURSIERS', 'UPSILON YOGA', 'PHI BOUTIQUE', 'CHI SERRURERIE', 'PSI CONSULTING', 'OMÉGA NETTOYAGE'];
+      wdays.forEach(function (d, k) {
+        var dsh = [0, 1, 2, 3].some(function (k2) { var dn = new Date(now); dn.setDate(dn.getDate() + 2 + k2); while (dn.getDay() === 0 || dn.getDay() === 6) dn.setDate(dn.getDate() + 1); return iso(dn) === d; });
+        (dsh || k % 2 === 0 ? [150, 120, 90] : [180, 120, 120]).forEach(function (mn, j) { // jamais plus de 7h : certains jours pleins, d'autres un peu en dessous
+          var n = k * 3 + j, id = 'fz' + n;
+          db.clients.push({ id: id, name: FZ[n % FZ.length] + (n >= FZ.length ? ' ' + (Math.floor(n / FZ.length) + 1) : ''), collaborator_id: 'k-eva', frequency: 'mensuel', reception_day: 1, time_min: mn, vat_due_day: 24, vat_regime: 'ca3_mensuel', priority: 2, active: true, version: 1 });
+          db.productions.push({ id: 'pz' + n, client_id: id, month: pm, expected_date: wdays[0], received_date: iso(now), version: 1 });
+          db.tasks.push({ id: 'tz' + n, production_id: 'pz' + n, client_id: id, month: pm, kind: 'production', collaborator_id: 'k-eva', planned_date: d, seq: j + 1, duration_min: mn, due_date: pm + '-24', locked: true, done: false, version: 1 });
+        });
+      });
+      [['FLEURS DU CANAL', 300], ['INSTITUT LUMIÈRE', 285], ['MENUISERIE DUPRÉ', 240], ['PIZZERIA BELLA VISTA', 225]].forEach(function (r, k) {
+        db.clients.push({ id: 'uz' + k, name: r[0], collaborator_id: 'k-eva', frequency: 'mensuel', reception_day: 1, time_min: r[1], vat_due_day: 21, vat_regime: 'ca3_mensuel', priority: 2, active: true, version: 1 });
+        db.productions.push({ id: 'puz' + k, client_id: 'uz' + k, month: pm, expected_date: wdays[0] || iso(now), received_date: iso(now), version: 1 });
+        db.tasks.push({ id: 'tuz' + k, production_id: 'puz' + k, client_id: 'uz' + k, month: pm, kind: 'production', collaborator_id: 'k-eva', planned_date: null, seq: 0, duration_min: r[1], due_date: pm + '-21', locked: false, done: false, version: 1 });
+      });      // Dashboard Clients d'exemple (à faire / fait / publié), à publier avant le 25 du mois
+      [['BRASSERIE DU PORT', 'todo'], ['LE PETIT BISTROT', 'done'], ['CRÊPERIE DES HALLES', 'pub'], ['INSTITUT LUMIÈRE', 'todo']].forEach(function (r, k) {
+        var id = 'dash' + k, cm = pm, dd = new Date(pm + '-25T12:00:00'); while (dd.getDay() === 0 || dd.getDay() === 6) dd.setDate(dd.getDate() + 1); var due = iso(dd);
+        db.clients.push({ id: id, name: r[0], collaborator_id: 'k-eva', frequency: 'mensuel', reception_day: 5, time_min: 0, vat_due_day: 21, vat_regime: 'ca3_mensuel', priority: 2, active: true, dashboard_freq: 'mensuel', dashboard_min: 60, dashboard_day: 25, version: 1 });
+        var dn = new Date(now); dn.setDate(dn.getDate() + 2 + k); while (dn.getDay() === 0 || dn.getDay() === 6) dn.setDate(dn.getDate() + 1);
+        db.tasks.push({ id: 'tdash' + k, production_id: null, client_id: id, month: cm, kind: 'dashboard', period: iso(new Date(Number(pm.slice(0, 4)), Number(pm.slice(5, 7)) - 2, 1)).slice(0, 7), collaborator_id: 'k-eva', planned_date: iso(dn), seq: 1, duration_min: 60, due_date: due, received_date: cm + '-01', locked: true, done: r[1] !== 'todo', done_at: r[1] !== 'todo' ? now.toISOString() : null, published_at: r[1] === 'pub' ? now.toISOString() : null, version: 1 });
+      });      
+      // V26.116 : semaine en cours remplie (tâches fictives terminées / du jour), demandes, TVA à faire et envoyées
+      var wk = []; for (var q = new Date(now); wk.length < 3; q.setDate(q.getDate() - 1)) if (q.getDay() >= 1 && q.getDay() <= 5) wk.unshift(iso(q)); // avant-hier, hier, aujourd'hui (jours ouvrés)
+      // nom, minutes, jour de la semaine (0 = lundi), terminé, TVA déposée, apprentie
+      [['CABINET VÉTO DES PINS', 150, 0, true, true], ['AUTO-ÉCOLE PRIMA', 120, 0, true, true], ['LIBRAIRIE LA PLUME', 90, 0, true, false], ['SALON ÉCLAT', 150, 1, true, false], ['TRAITEUR SAVEURS', 120, 2, false, false], ['BIO MARCHÉ', 90, 2, false, false, true],
+       ['OPTIQUE VISION PLUS', 90, 0, true, false], ['GARAGE DES QUATRE ROUTES', 120, 1, true, false], ['FROMAGERIE DU MARCHÉ', 90, 1, true, false], ['ÉLECTRICITÉ VOLTA', 30, 1, true, false], ['CAVE À VINS LE CEP', 90, 2, false, false], ['ARCHI & CO', 60, 2, false, false]].forEach(function (r, k) {
+        var id = 'wk' + k, day = wk[Math.min(r[2], wk.length - 1)] || iso(now), done = r[3] && day <= iso(now);
+        db.clients.push({ id: id, name: r[0], collaborator_id: 'k-eva', frequency: 'mensuel', reception_day: 3, time_min: r[1], vat_due_day: 24, vat_regime: 'ca3_mensuel', priority: 2, active: true, version: 1 });
+        db.productions.push({ id: 'pwk' + k, client_id: id, month: m, expected_date: m + '-03', received_date: m + '-03', filing: r[4] ? { CA3: { via: 'jedeclare', at: iso(now) + 'T10:00:00Z' } } : null, version: 1 });
+        db.tasks.push({ id: 'twk' + k, production_id: 'pwk' + k, client_id: id, month: m, kind: 'production', collaborator_id: 'k-eva', planned_date: day, seq: 1, duration_min: r[1], due_date: m + '-24', locked: true, done: done, done_at: done ? now.toISOString() : null, version: 1 });
+      });
+      [['TRAITEUR SAVEURS', 'wk4'], ['BIO MARCHÉ', 'wk5']].forEach(function (r, k) {
+        db.tasks.push({ id: 'inf' + k, production_id: 'pwk' + (4 + k), client_id: r[1], month: m, kind: 'info', collaborator_id: 'k-eva', planned_date: null, seq: 0, duration_min: 15, due_date: m + '-24', locked: false, done: false, version: 1 });
+      });
+      // V26.121 : semaine classique du RC (Hugo), 3 dossiers par jour, jamais plus de 7h
+      var HG = ['HÔTEL LES GLYCINES', 'CLINIQUE DENTAIRE SOLEIL', 'TRANSPORTS RAPIDO', 'AGENCE NOVA COM', 'BOULANGERIE LE FOURNIL', 'IMPRIMERIE DU CENTRE', 'CABINET KINÉ ÉQUILIBRE', 'MAISON DU VÉLO', 'SCI LES ORMES', 'ÉPICERIE FINE OLIVIA', 'GARAGE AUTO PLUS', 'STUDIO DANSE ÉTOILE', 'ÉCOLE DE MUSIQUE ARPÈGE', 'LAVERIE BULLE', 'ATELIER CÉRAMIQUE TERRA'];
+      var hd = []; for (var q2 = new Date(now); hd.length < 2; q2.setDate(q2.getDate() - 1)) if (q2.getDay() >= 1 && q2.getDay() <= 5) hd.unshift(iso(q2));
+      hd = hd.concat(wdays.slice(0, 3));
+      hd.forEach(function (d, k) {
+        (k % 2 ? [150, 120, 90] : [180, 120, 120]).forEach(function (mn, j) {
+          var n = k * 3 + j, id = 'hg' + n, done = d < iso(now);
+          db.clients.push({ id: id, name: HG[n % HG.length], collaborator_id: 'k-karim', frequency: 'mensuel', reception_day: 3, time_min: mn, vat_due_day: 24, vat_regime: 'ca3_mensuel', priority: 2, active: true, version: 1 });
+          db.productions.push({ id: 'phg' + n, client_id: id, month: m, expected_date: m + '-03', received_date: m + '-03', version: 1 });
+          db.tasks.push({ id: 'thg' + n, production_id: 'phg' + n, client_id: id, month: m, kind: 'production', collaborator_id: 'k-karim', planned_date: d, seq: j + 1, duration_min: mn, due_date: m + '-24', locked: true, done: done, done_at: done ? now.toISOString() : null, version: 1 });
+        });
+      });
+      // pièces attendues chez Hugo (écran Réceptions de la démo RC)
+      [['PRESSING ÉCLAIR', 2], ['FLEURISTE LES PIVOINES', 3], ['BISTROT DU COIN', 5]].forEach(function (r, k) {
+        var id = 'hr' + k, ed = new Date(now); ed.setDate(ed.getDate() + r[1]);
+        db.clients.push({ id: id, name: r[0], collaborator_id: 'k-karim', frequency: 'mensuel', reception_day: ed.getDate(), time_min: 90, vat_due_day: 24, vat_regime: 'ca3_mensuel', priority: 2, active: true, version: 1 });
+        db.productions.push({ id: 'phr' + k, client_id: id, month: m, expected_date: iso(ed), nominal_date: iso(ed), version: 1 });
+        db.tasks.push({ id: 'thr' + k, production_id: 'phr' + k, client_id: id, month: m, kind: 'production', collaborator_id: 'k-karim', planned_date: null, seq: 0, duration_min: 90, due_date: m + '-24', locked: false, done: false, version: 1 });
+      });
+      // pièces du mois suivant attendues (écran Réceptions)
+      ['wk0', 'wk1', 'wk2', 'wk3'].forEach(function (id, k) {
+        db.productions.push({ id: 'pnx' + k, client_id: id, month: next, expected_date: next + '-03', nominal_date: next + '-03', version: 1 });
+        db.tasks.push({ id: 'tnx' + k, production_id: 'pnx' + k, client_id: id, month: next, kind: 'production', collaborator_id: 'k-eva', planned_date: null, seq: 0, duration_min: 120, due_date: next + '-24', locked: false, done: false, version: 1 });
+      });
+      var ch = pres.filter(function (d) { return d >= iso(now); }).slice(0, 2);
+      ch.forEach(function (d, k) {
+        var id = 'ap' + k; db.clients.push({ id: id, name: ['PHARMACIE DU LAC', 'STUDIO PIXEL'][k], collaborator_id: 'k-chloe', frequency: 'mensuel', reception_day: 3, time_min: 180, vat_due_day: 24, vat_regime: 'ca3_mensuel', priority: 2, active: true, apprenti: true, version: 1 });
+        db.productions.push({ id: 'pap' + k, client_id: id, month: m, expected_date: m + '-03', received_date: m + '-03', version: 1 });
+        db.tasks.push({ id: 'tap' + k, production_id: 'pap' + k, client_id: id, month: m, kind: 'production', collaborator_id: 'k-chloe', planned_date: d, seq: 1, duration_min: 180, due_date: m + '-24', locked: true, done: false, version: 1 });
+      });      
+      // V26.129 : acomptes d'IS sur quelques dossiers (clôtures variées)
+      [['wk0', '12-31'], ['wk1', '06-30'], ['hg0', '12-31'], ['hg2', '09-30']].forEach(function (r) { db.clients.forEach(function (c) { if (c.id === r[0]) { c.is_acompte = true; c.is_cloture = r[1]; } }); });
+      // V26.133 : calculs d'acomptes IS enregistrés (montants) et premiers acomptes déjà payés
+      var yIS = now.getFullYear();
+      [['wk0', '12-31', 48000, 42000], ['wk1', '06-30', 9600, 8400], ['hg0', '12-31', 126000, 110000]].forEach(function (r) {
+        db.clients.forEach(function (c) { if (c.id !== r[0]) return; var d = {};
+          [yIS, yIS + 1].forEach(function (yy) { d[yy + '-' + r[1]] = { first: false, is2: r[3], is1: r[2], m1: 12, m2: 12, man: {}, paid: {}, at: now.toISOString(), by: 'Léa Moreau' }; });
+          if (r[1] === '12-31') d[yIS + '-12-31'].paid = { 1: yIS + '-03-12', 2: yIS + '-06-11', 3: yIS + '-09-14' };
+          c.is_data = JSON.stringify(d); });
+      });      // V26.127 : suivi CFE (avis de l'an dernier renseignés, ceux de cette année attendus pour le 5 novembre)
+      var py = String(now.getFullYear() - 1), cy = String(now.getFullYear());
+      [['wk0', 1240, 'mensualise', true, ''], ['wk1', 612, 'prelevement', true, 'Prélèvement au 15/12'], ['wk2', 356, 'a_payer', true, 'Payé par le client le 10/12'], ['wk3', 890, 'a_payer', false, 'Client à relancer'], ['hg0', 2105, 'mensualise', true, ''], ['hg1', 478, 'prelevement', true, ''], ['hg4', null, 'pas_avis', true, 'Exonéré : première année d\'activité']].forEach(function (r) {
+        db.clients.forEach(function (c) { if (c.id === r[0]) { c.cfe = true; c.cfe_suivi = {}; c.cfe_suivi[py] = { amount: r[1], mode: r[2], warned: r[3], comment: r[4] }; if (r[0] === 'wk2') c.cfe_suivi[py].paid = py + '-12-10'; if (r[0] === 'wk0') c.cfe_suivi[cy] = { mode: 'mensualise', comment: 'Mensualisation reconduite' }; } });
+      // V26.135 : suivi CVAE (déclaration 1329-DEF et solde au 5 mai) — année dernière à jour, cette année en cours
+      [['wk1', 2150], ['wk4', 0], ['hg0', 8420], ['hg1', 1310]].forEach(function (r) {
+        db.clients.forEach(function (c) { if (c.id !== r[0]) return; c.cvae = true; c.cvae_suivi = {}; c.cvae_suivi[cy] = { filed: cy + '-04-28', amount: r[1], paid: r[1] ? cy + '-04-30' : null, comment: r[1] ? '' : 'CA sous le seuil : rien à payer' }; });
+      });      });      localStorage.setItem(K, JSON.stringify(db)); localStorage.setItem('jbflow-demo-seeded-v19', '1');
+      if (!sessionStorage.getItem('jbflow-sandbox-role')) { sessionStorage.setItem('planif-demo-user', 'admin@demo.local'); sessionStorage.setItem('planif-view-as', 'manager'); location.hash = '#/dashboard'; } location.reload(); // bac à sable : on garde le profil choisi
+    } catch (e) { /* démo sans données d'exemple */ }
+  }, 1200);
+})();
+</script>
+<script>
+/* Démo publiée : la visite guidée démarre seule à la première ouverture ; le sélecteur ci-dessous montre la démo de chaque rôle
+   (dans l'outil réel, la démo est choisie automatiquement selon le compte connecté). */
+(function () {
+  var ROLES = [['admin@demo.local', 'Vue Manager'], ['hugo@demo.local', 'Vue Responsable client'], ['lea@demo.local', 'Vue Collaborateur']];
+  function ready() { return window.JBFlowTour && document.querySelector('#app .side'); }
+  function start() { if (ready()) { window.JBFlowTour(); return; } setTimeout(start, 400); }
+  function bar() {
+    if (document.getElementById('demo-roles')) return;
+    var cur = sessionStorage.getItem('planif-demo-user') || 'admin@demo.local', b = document.createElement('div'); b.id = 'demo-roles';
+    b.innerHTML = '<span>Changer de profil :</span>' + ROLES.map(function (r) { return '<button type="button" data-u="' + r[0] + '"' + (r[0] === cur ? ' class="on"' : '') + '>' + r[1] + '</button>'; }).join('');
+    b.addEventListener('click', function (e) { var u = e.target.getAttribute && e.target.getAttribute('data-u'); if (!u) return; sessionStorage.setItem('planif-demo-user', u); try { localStorage.setItem('jbflow-tour-auto', '1'); } catch (x) { } location.hash = u.indexOf('admin') === 0 ? '#/dashboard' : '#/today'; location.reload(); });
+    document.body.appendChild(b);
+  }
+  var st = document.createElement('style');
+  st.textContent = '#demo-roles{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:9000;display:flex;gap:6px;align-items:center;padding:6px 8px 6px 12px;border-radius:999px;background:#14171a;color:#f2f4ee;font:600 12.5px/1 Geist,Inter,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.35)}#demo-roles button{all:unset;cursor:pointer;padding:7px 11px;border-radius:999px;background:rgba(255,255,255,.08)}#demo-roles button:hover{background:rgba(255,255,255,.16)}#demo-roles button.on{background:#ffd43b;color:#14171a}body.touring #demo-roles{display:none}';
+  document.head.appendChild(st);
+  function boot() {
+    if (!ready()) { setTimeout(boot, 500); return; }
+    bar();
+    try {
+      if (localStorage.getItem('jbflow-tour-auto')) { localStorage.removeItem('jbflow-tour-auto'); start(); }
+      else if (localStorage.getItem('jbflow-demo-seeded-v19') && !localStorage.getItem('planif-tour-seen')) start();
+    } catch (e) { }
+  }
+  setTimeout(boot, 1500);
+})();
+</script>

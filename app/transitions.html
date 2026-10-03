@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JB Flow — Aperçu des transitions</title>
+<link rel="icon" type="image/png" href="logo-32.png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --g: #3DDC84; --l: #E4F25A; --t: #2FD3C1; --ink: #0B0D0A; --ease: cubic-bezier(.2, .8, .2, 1); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: Inter, system-ui, sans-serif; background: #070908; color: #F2F4EE; overflow: hidden; }
+  /* Barre de choix */
+  .bar { position: fixed; z-index: 50; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 6px; padding: 6px; border-radius: 18px; background: rgba(20, 24, 20, .82); border: 1px solid rgba(255, 255, 255, .12); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 20px 50px rgba(0, 0, 0, .45); width: max-content; max-width: calc(100vw - 24px); flex-wrap: wrap; justify-content: center; }
+  .bar button { border: 0; border-radius: 13px; padding: 10px 14px; font: 600 13.5px Inter, sans-serif; color: rgba(242, 244, 238, .8); background: transparent; cursor: pointer; white-space: nowrap; }
+  .bar button b { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 7px; margin-right: 7px; font-size: 11px; background: rgba(255, 255, 255, .1); }
+  .bar button:hover { background: rgba(255, 255, 255, .07); color: #fff; }
+  .bar button.on { background: linear-gradient(100deg, var(--g), var(--l)); color: #04160B; }
+  .bar button.on b { background: rgba(4, 22, 11, .15); }
+  .cap { position: fixed; z-index: 50; left: 50%; top: 14px; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); text-align: center; font-size: 13.5px; line-height: 1.45; color: rgba(242, 244, 238, .85); padding: 10px 16px; border-radius: 14px; background: rgba(10, 12, 10, .6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); pointer-events: none; transition: opacity .3s; }
+  .cap b { color: var(--g); }
+
+  /* Écran de connexion (maquette) */
+  .login { position: fixed; inset: 0; overflow: hidden; }
+  .bg { position: absolute; inset: -40px; background: #070908; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(80px); opacity: .55; }
+  .b1 { width: 55vw; height: 55vw; left: -12vw; top: -18vw; background: radial-gradient(circle, #1E8F55, transparent 65%); }
+  .b2 { width: 45vw; height: 45vw; right: -10vw; bottom: -14vw; background: radial-gradient(circle, #8C9A22, transparent 65%); }
+  .b3 { width: 30vw; height: 30vw; right: 22vw; top: 8vh; background: radial-gradient(circle, #13806F, transparent 65%); opacity: .4; }
+  .grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px); background-size: 44px 44px; mask-image: radial-gradient(ellipse at 50% 40%, #000 30%, transparent 75%); -webkit-mask-image: radial-gradient(ellipse at 50% 40%, #000 30%, transparent 75%); }
+  .brand { position: absolute; left: 32px; top: 28px; display: flex; align-items: center; gap: 12px; }
+  .brand img { width: 56px; height: 56px; border-radius: 16px; box-shadow: 0 12px 34px rgba(61, 220, 132, .3); }
+  .brand b { font-size: 21px; background: linear-gradient(90deg, var(--g), var(--l) 35%, var(--t) 70%, var(--g)); background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: sheen 9s linear infinite; }
+  .brand small { display: block; font-size: 12px; color: rgba(242, 244, 238, .5); }
+  @keyframes sheen { to { background-position: -220% 0; } }
+  .card { position: absolute; left: 50%; top: 50%; width: min(390px, calc(100vw - 32px)); margin-left: calc(min(390px, calc(100vw - 32px)) / -2); transform: translateY(-50%); padding: 30px 28px 26px; border-radius: 28px; background: linear-gradient(165deg, rgba(255, 255, 255, .11), rgba(255, 255, 255, .035)); border: 1px solid rgba(255, 255, 255, .12); backdrop-filter: blur(28px) saturate(160%); -webkit-backdrop-filter: blur(28px) saturate(160%); box-shadow: 0 40px 90px rgba(0, 0, 0, .45), 0 0 30px rgba(61, 220, 132, .14); }
+  .card h2 { margin: 0 0 4px; font-size: 27px; letter-spacing: -.03em; }
+  .card p { margin: 0 0 20px; color: rgba(242, 244, 238, .65); font-size: 14px; }
+  .inp { height: 46px; border-radius: 14px; background: rgba(0, 0, 0, .28); border: 1px solid rgba(255, 255, 255, .1); margin-bottom: 12px; display: flex; align-items: center; padding: 0 14px; color: rgba(242, 244, 238, .6); font-size: 14px; }
+  .btn { height: 50px; border-radius: 15px; margin-top: 16px; display: grid; place-items: center; font-weight: 650; color: #04160B; background: linear-gradient(100deg, var(--g), #7BE68F 55%, var(--l)); box-shadow: 0 14px 34px rgba(61, 220, 132, .35); }
+  .fc { position: absolute; padding: 12px 14px; border-radius: 16px; background: linear-gradient(160deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, .04)); border: 1px solid rgba(255, 255, 255, .12); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); font-size: 12px; color: rgba(242, 244, 238, .7); animation: float 7s ease-in-out infinite; }
+  .fc b { display: block; font-size: 17px; color: #fff; margin-top: 2px; }
+  .fc.a { left: 7vw; top: 34vh; } .fc.b { right: 7vw; top: 22vh; animation-delay: -2.5s; } .fc.c { left: 12vw; bottom: 22vh; animation-delay: -4s; } .fc.d { right: 10vw; bottom: 26vh; animation-delay: -1.2s; }
+  @keyframes float { 50% { translate: 0 -12px; } }
+  @media (max-width: 760px) { .fc { display: none; } .brand { left: 18px; top: 18px; } }
+
+  /* Tableau de bord (maquette) */
+  .dash { position: fixed; inset: 0; background: #EDEEE8; color: #111; display: flex; visibility: hidden; }
+  .side { width: 220px; background: #0E0F0C; padding: 20px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .side .lg { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 700; margin-bottom: 16px; }
+  .side .lg img { width: 38px; height: 38px; border-radius: 12px; }
+  .side i { display: block; height: 36px; border-radius: 11px; background: rgba(255, 255, 255, .06); }
+  .side i.on { background: var(--g); }
+  .main { flex: 1; padding: 30px 34px; overflow: hidden; }
+  .main small { font-size: 11px; letter-spacing: .08em; color: #777; font-weight: 600; }
+  .main h1 { margin: 4px 0 22px; font-size: 30px; letter-spacing: -.03em; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; }
+  .k { background: #fff; border-radius: 20px; padding: 18px; box-shadow: 0 1px 2px rgba(0, 0, 0, .04); }
+  .k.dk { background: #0E0F0C; color: #fff; }
+  .k span { font-size: 12.5px; color: #888; } .k b { display: block; font-size: 28px; margin-top: 8px; letter-spacing: -.03em; }
+  .bar2 { height: 8px; border-radius: 9px; background: #ECECE6; margin-top: 12px; overflow: hidden; } .bar2 i { display: block; height: 100%; width: 64%; background: linear-gradient(90deg, var(--g), var(--l)); border-radius: 9px; }
+  .list { background: #fff; border-radius: 20px; padding: 8px 18px; }
+  .row { display: flex; justify-content: space-between; padding: 13px 0; border-bottom: 1px solid #F0F0EA; font-size: 14px; } .row:last-child { border: 0; } .row em { font-style: normal; font-size: 12px; padding: 3px 9px; border-radius: 99px; background: #E6F9EE; color: #1B8A4E; }
+  @media (max-width: 760px) { .side { display: none; } .main { padding: 22px 16px; } .kpis { grid-template-columns: 1fr 1fr; } .kpis .k:last-child { display: none; } }
+
+  /* Couches d'effets */
+  .fx { position: fixed; inset: 0; z-index: 20; pointer-events: none; }
+</style>
+</head>
+<body>
+  <div class="login" id="login">
+    <div class="bg" id="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="grid"></div></div>
+    <div class="brand" id="brand"><img id="blogo" src="logo-192.png" alt=""><div><b>JB Flow</b><small>Production comptable &amp; TVA</small></div></div>
+    <div class="fc a">Charge du jour<b>6h45 / 7h</b></div>
+    <div class="fc b">Réceptions<b>3 à valider</b></div>
+    <div class="fc c">DUPONT SARL · DES<b>J-2</b></div>
+    <div class="fc d">Équipe<b>72 %</b></div>
+    <div class="card" id="card"><h2>Bienvenue !</h2><p>Travaillez en toute sérénité.</p><div class="inp">marie@cabinet.fr</div><div class="inp">••••••••••</div><div class="btn">Se connecter →</div></div>
+  </div>
+
+  <div class="dash" id="dash">
+    <div class="side"><div class="lg"><img src="logo-192.png" alt="">JB Flow</div><i class="on"></i><i></i><i></i><i></i><i></i></div>
+    <div class="main">
+      <small class="c">VENDREDI 25 SEPTEMBRE</small>
+      <h1 class="c">Bonjour, Marie</h1>
+      <div class="kpis"><div class="k c"><span>Charge du jour</span><b>6h45</b><div class="bar2"><i></i></div></div><div class="k dk c"><span>Reste à faire</span><b>4 tâches</b></div><div class="k c"><span>Période</span><b>J-3</b></div></div>
+      <div class="list c"><div class="row">DUPONT SARL — TVA CA3<em>En cours</em></div><div class="row">MARTIN & FILS — Production<em>Planifié</em></div><div class="row">BOULANGERIE LEROY — Lettrage<em>Planifié</em></div><div class="row">SCI DES PINS — Demande d'infos<em>Relance</em></div></div>
+    </div>
+  </div>
+
+  <div class="fx" id="fx"></div>
+  <div class="cap" id="cap">Choisis une transition ci-dessous : elle se joue comme si tu cliquais sur « Se connecter ».</div>
+  <div class="bar" id="bar">
+    <button data-t="1"><b>1</b>Flux</button>
+    <button data-t="2"><b>2</b>Portail</button>
+    <button data-t="3"><b>3</b>Accueil personnalisé</button>
+    <button data-t="4"><b>4</b>Verre dissous</button>
+    <button data-t="5"><b>5</b>Rideau lumineux</button>
+    <button data-t="6"><b>6</b>Traversée du logo</button>
+    <button data-t="7"><b>7</b>Bascule 3D</button>
+  </div>
+
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const login = $('#login'), dash = $('#dash'), fx = $('#fx'), card = $('#card'), bg = $('#bg');
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const EASE = 'cubic-bezier(.2,.8,.2,1)';
+const CAPS = {
+  1: '<b>1 · Flux</b> — le logo JB se détache et vient au centre, puis la vague verte du logo balaie l’écran et révèle le tableau de bord.',
+  2: '<b>2 · Portail</b> — la carte de verre se contracte en un point lumineux qui s’ouvre en cercle et révèle le tableau de bord.',
+  3: '<b>3 · Accueil personnalisé</b> — « Bonjour Marie » s’écrit en dégradé, la charge du jour se remplit, puis le tableau de bord monte en cascade.',
+  5: '<b>5 · Rideau lumineux</b> — un trait de lumière verte coupe l’écran en deux, les deux moitiés s’écartent et dévoilent le tableau de bord. (≈ 0,7 s)',
+  6: '<b>6 · Traversée du logo</b> — le logo JB surgit au centre et on « traverse » le logo pour arriver sur le tableau de bord. (≈ 0,8 s)',
+  7: '<b>7 · Bascule 3D</b> — la carte pivote et montre « Connecté ✓ » sur sa face verte, puis le tableau de bord remonte avec un léger rebond. (≈ 0,9 s)',
+  4: '<b>4 · Verre dissous</b> — les cartes s’envolent, le fond se floute et s’illumine, le tableau de bord apparaît en douceur.'
+};
+let busy = false;
+
+function reset() {
+  document.getAnimations().forEach(a => { if (!a.animationName) a.cancel(); });
+  fx.innerHTML = ''; fx.style.cssText = '';
+  dash.style.cssText = ''; login.style.cssText = '';
+  $$('.dash .c').forEach(e => (e.style.cssText = ''));
+}
+function showDash() { dash.style.visibility = 'visible'; }
+function cascade(delay = 0) {
+  return Promise.all($$('.dash .c').map((e, i) => e.animate([{ opacity: 0, transform: 'translateY(18px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: delay + i * 70, easing: EASE, fill: 'backwards' }).finished));
+}
+
+/* 1 · Flux */
+async function t1() {
+  const r = $('#blogo').getBoundingClientRect(), size = Math.min(170, innerWidth * .38);
+  const lg = document.createElement('img'); lg.src = 'logo-192.png';
+  lg.style.cssText = 'position:fixed;left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px;border-radius:16px;z-index:3;box-shadow:0 20px 60px rgba(61,220,132,.45)';
+  fx.appendChild(lg);
+  $('#blogo').style.visibility = 'hidden';
+  const dx = innerWidth / 2 - (r.left + r.width / 2), dy = innerHeight / 2 - (r.top + r.height / 2), sc = size / r.width;
+  login.animate([{ filter: 'none', opacity: 1 }, { filter: 'blur(6px) brightness(.6)', opacity: .8 }], { duration: 600, easing: EASE, fill: 'forwards' });
+  await lg.animate([{ transform: 'none' }, { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sc * 1.08 + ')', offset: .75 }, { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sc + ')' }], { duration: 700, easing: EASE, fill: 'forwards' }).finished;
+  await wait(120);
+  // La vague (bande aux bords ondulés reprenant le dégradé du logo)
+  const w = document.createElement('div');
+  w.style.cssText = 'position:fixed;top:0;left:0;height:100vh;width:260vw;z-index:4;filter:drop-shadow(0 0 30px rgba(61,220,132,.6))';
+  w.innerHTML = '<svg viewBox="0 0 300 100" preserveAspectRatio="none" width="100%" height="100%"><defs><linearGradient id="wg" x1="0" x2="1"><stop offset="0" stop-color="#E4F25A"/><stop offset=".35" stop-color="#3DDC84"/><stop offset=".7" stop-color="#2FD3C1"/><stop offset="1" stop-color="#1FA36A"/></linearGradient></defs><path d="M30 0 C5 20 55 45 25 70 C5 85 20 95 30 100 L270 100 C295 80 245 55 275 30 C295 15 280 5 270 0 Z" fill="url(#wg)"/></svg>';
+  fx.appendChild(w);
+  const W = innerWidth, sweep = w.animate([{ transform: 'translateX(' + (-2.7 * W) + 'px)' }, { transform: 'translateX(' + (1.1 * W) + 'px)' }], { duration: 1250, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards' });
+  await wait(560);
+  lg.remove(); login.style.visibility = 'hidden'; showDash();
+  cascade(180);
+  await sweep.finished; w.remove();
+}
+
+/* 2 · Portail */
+async function t2() {
+  const r = card.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  $$('.fc, .brand').forEach(e => e.animate([{ opacity: 1 }, { opacity: 0, transform: 'scale(.9)' }], { duration: 350, fill: 'forwards' }));
+  $$('#card > *').forEach(e => e.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: 'forwards' }));
+  await card.animate([
+    { transform: 'translateY(-50%)', borderRadius: '28px' },
+    { transform: 'translateY(-50%) scale(.04)', borderRadius: '50%', background: '#3DDC84', boxShadow: '0 0 40px #3DDC84' }
+  ], { duration: 520, easing: 'cubic-bezier(.7,0,.84,0)', fill: 'forwards' }).finished;
+  // Point lumineux
+  const dot = document.createElement('div');
+  dot.style.cssText = 'position:fixed;left:' + (cx - 8) + 'px;top:' + (cy - 8) + 'px;width:16px;height:16px;border-radius:50%;background:#E4F25A;box-shadow:0 0 30px 10px #3DDC84,0 0 90px 30px rgba(61,220,132,.5)';
+  fx.appendChild(dot); card.style.visibility = 'hidden';
+  await dot.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.8)' }, { transform: 'scale(1)' }], { duration: 260, easing: 'ease-in-out' }).finished;
+  // Ouverture circulaire + anneau lumineux
+  const R = Math.hypot(Math.max(cx, innerWidth - cx), Math.max(cy, innerHeight - cy));
+  showDash(); dash.style.zIndex = 10;
+  const ring = document.createElement('div');
+  ring.style.cssText = 'position:fixed;left:' + cx + 'px;top:' + cy + 'px;width:0;height:0;border-radius:50%;z-index:11;box-shadow:0 0 0 3px #3DDC84,0 0 40px 8px rgba(61,220,132,.6)';
+  fx.style.zIndex = 12; fx.appendChild(ring);
+  const open = { duration: 850, easing: 'cubic-bezier(.7,0,.2,1)', fill: 'forwards' };
+  dash.animate([{ clipPath: 'circle(0px at ' + cx + 'px ' + cy + 'px)' }, { clipPath: 'circle(' + R + 'px at ' + cx + 'px ' + cy + 'px)' }], open);
+  ring.animate([{ width: '0px', height: '0px', margin: '0', opacity: 1 }, { width: 2 * R + 'px', height: 2 * R + 'px', margin: -R + 'px 0 0 ' + -R + 'px', opacity: .2 }], open);
+  dot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+  cascade(250);
+  await wait(900); ring.remove();
+}
+
+/* 3 · Accueil personnalisé */
+async function t3() {
+  login.animate([{ filter: 'none', opacity: 1 }, { filter: 'blur(14px)', opacity: .35 }], { duration: 500, easing: EASE, fill: 'forwards' });
+  const o = document.createElement('div');
+  o.style.cssText = 'position:fixed;inset:0;display:grid;place-items:center;z-index:5;background:rgba(7,9,8,.55)';
+  const txt = 'Bonjour Marie';
+  o.innerHTML = '<div id="hw" style="text-align:center"><div style="position:relative;width:120px;height:120px;margin:0 auto 22px"><svg viewBox="0 0 120 120" width="120" height="120" style="transform:rotate(-90deg)"><defs><linearGradient id="rg"><stop offset="0" stop-color="#3DDC84"/><stop offset="1" stop-color="#E4F25A"/></linearGradient></defs><circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="9"/><circle id="arc" cx="60" cy="60" r="52" fill="none" stroke="url(#rg)" stroke-width="9" stroke-linecap="round" stroke-dasharray="327" stroke-dashoffset="327"/></svg><div style="position:absolute;inset:0;display:grid;place-items:center;font:700 22px Inter"><span id="pc">0 %</span></div></div>'
+    + '<div style="font:700 clamp(40px,7vw,76px)/1.05 Inter,sans-serif;letter-spacing:-.045em">' + [...txt].map((c, i) => '<span class="ch" style="display:inline-block;opacity:0;background:linear-gradient(90deg,#3DDC84,#E4F25A 45%,#2FD3C1);background-size:' + txt.length + '00% 100%;background-position:' + (i * 100 / (txt.length - 1)) + '% 0;-webkit-background-clip:text;background-clip:text;color:transparent">' + (c === ' ' ? '&nbsp;' : c) + '</span>').join('') + '</div>'
+    + '<div id="sub" style="margin-top:14px;font-size:16px;color:rgba(242,244,238,.7);opacity:0">Charge du jour : 6h45 sur 7h · 4 dossiers</div></div>';
+  fx.appendChild(o);
+  $$('.ch').forEach((c, i) => c.animate([{ opacity: 0, transform: 'translateY(26px) rotate(6deg)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'none' }], { duration: 520, delay: 150 + i * 45, easing: EASE, fill: 'forwards' }));
+  $('#arc').animate([{ strokeDashoffset: 327 }, { strokeDashoffset: 327 * .04 }], { duration: 1100, delay: 250, easing: EASE, fill: 'forwards' });
+  const t0 = performance.now(); (function count() { const p = Math.min(1, (performance.now() - t0 - 250) / 1100); if (p > 0) $('#pc').textContent = Math.round(96 * (1 - Math.pow(1 - p, 3))) + ' %'; if (p < 1 && $('#pc')) setTimeout(count, 16); })();
+  $('#sub').animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 900, easing: EASE, fill: 'forwards' });
+  await wait(1900);
+  showDash(); login.style.visibility = 'hidden';
+  o.animate([{ background: 'rgba(7,9,8,.55)' }, { background: 'rgba(7,9,8,0)' }], { duration: 600, fill: 'forwards' });
+  $('#hw').animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-60px) scale(.92)' }], { duration: 550, easing: 'cubic-bezier(.5,0,.2,1)', fill: 'forwards' });
+  dash.animate([{ opacity: 0, filter: 'blur(6px)' }, { opacity: 1, filter: 'none' }], { duration: 500, easing: EASE });
+  await cascade(200); o.remove();
+}
+
+/* 4 · Verre dissous */
+async function t4() {
+  $$('.fc').forEach((e, i) => { const left = e.getBoundingClientRect().left < innerWidth / 2; e.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translate(' + (left ? -45 : 45) + 'vw,' + (i % 2 ? -12 : 10) + 'vh) rotate(' + (left ? -22 : 22) + 'deg) scale(.8)' }], { duration: 850, delay: i * 50, easing: 'cubic-bezier(.5,0,.2,1)', fill: 'forwards' }); });
+  $('#brand').animate([{ opacity: 1 }, { opacity: 0, transform: 'translateY(-20px)' }], { duration: 500, fill: 'forwards' });
+  bg.animate([{ filter: 'none' }, { filter: 'blur(24px) brightness(2.2) saturate(1.4)' }], { duration: 900, easing: EASE, fill: 'forwards' });
+  card.animate([{ opacity: 1, filter: 'none', transform: 'translateY(-50%)' }, { opacity: 0, filter: 'blur(14px)', transform: 'translateY(-50%) scale(1.1)' }], { duration: 700, delay: 150, easing: EASE, fill: 'forwards' });
+  await wait(520);
+  showDash(); dash.style.zIndex = 10;
+  await dash.animate([{ opacity: 0, transform: 'scale(.965)', filter: 'blur(10px)' }, { opacity: 1, transform: 'none', filter: 'none' }], { duration: 750, easing: EASE, fill: 'backwards' }).finished;
+}
+
+/* 5 · Rideau lumineux */
+async function t5() {
+  showDash();
+  const halves = [0, 1].map(i => { const c = login.cloneNode(true); c.removeAttribute('id'); c.querySelectorAll('[id]').forEach(e => e.removeAttribute('id')); c.style.cssText = 'z-index:6;clip-path:' + (i ? 'inset(50% 0 0 0)' : 'inset(0 0 50% 0)') + ';will-change:transform'; fx.appendChild(c); return c; });
+  login.style.visibility = 'hidden'; fx.style.zIndex = 30;
+  const line = document.createElement('div');
+  line.style.cssText = 'position:fixed;left:0;right:0;top:50%;height:3px;margin-top:-1.5px;z-index:7;background:linear-gradient(90deg,transparent,#E4F25A 20%,#3DDC84 50%,#2FD3C1 80%,transparent);box-shadow:0 0 18px 4px rgba(61,220,132,.8),0 0 60px 12px rgba(61,220,132,.35);transform-origin:50% 50%';
+  fx.appendChild(line);
+  await line.animate([{ transform: 'scaleX(0)', opacity: 1 }, { transform: 'scaleX(1)', opacity: 1 }], { duration: 220, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'forwards' }).finished;
+  const o = { duration: 520, easing: 'cubic-bezier(.7,0,.2,1)', fill: 'forwards' };
+  halves[0].animate([{ transform: 'none' }, { transform: 'translateY(-52%)' }], o);
+  halves[1].animate([{ transform: 'none' }, { transform: 'translateY(52%)' }], o);
+  line.animate([{ opacity: 1, transform: 'scaleX(1) scaleY(1)' }, { opacity: 0, transform: 'scaleX(1.1) scaleY(8)' }], { duration: 420, easing: 'ease-out', fill: 'forwards' });
+  dash.animate([{ transform: 'scale(.94)', filter: 'brightness(1.4)' }, { transform: 'none', filter: 'none' }], { duration: 560, easing: EASE });
+  cascade(120);
+  await wait(560); fx.innerHTML = '';
+}
+
+/* 6 · Traversée du logo */
+async function t6() {
+  const s = Math.min(150, innerWidth * .34);
+  const lg = document.createElement('img'); lg.src = 'logo-192.png';
+  lg.style.cssText = 'position:fixed;left:50%;top:50%;width:' + s + 'px;height:' + s + 'px;margin:' + (-s / 2) + 'px 0 0 ' + (-s / 2) + 'px;border-radius:' + (s * .28) + 'px;z-index:8;box-shadow:0 0 60px rgba(61,220,132,.55);will-change:transform,opacity';
+  fx.appendChild(lg); fx.style.zIndex = 30;
+  login.animate([{ transform: 'none', opacity: 1 }, { transform: 'scale(.92)', opacity: .15 }], { duration: 300, easing: EASE, fill: 'forwards' });
+  await lg.animate([{ transform: 'scale(.2)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 1, offset: .7 }, { transform: 'scale(1)', opacity: 1 }], { duration: 300, easing: EASE, fill: 'forwards' }).finished;
+  await wait(90);
+  showDash(); login.style.visibility = 'hidden';
+  lg.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(24)', opacity: 0 }], { duration: 480, easing: 'cubic-bezier(.6,0,.3,1)', fill: 'forwards' });
+  dash.animate([{ transform: 'scale(1.12)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 480, easing: 'cubic-bezier(.3,0,.2,1)' });
+  cascade(150);
+  await wait(500); lg.remove();
+}
+
+/* 7 · Bascule 3D */
+async function t7() {
+  const face = document.createElement('div');
+  const r = card.getBoundingClientRect();
+  face.style.cssText = 'position:fixed;left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px;border-radius:28px;z-index:8;display:grid;place-items:center;background:linear-gradient(145deg,#3DDC84,#E4F25A);color:#04160B;font:700 26px Inter,sans-serif;letter-spacing:-.03em;box-shadow:0 30px 80px rgba(61,220,132,.45);backface-visibility:hidden';
+  face.innerHTML = '<div style="text-align:center"><div style="width:62px;height:62px;border-radius:50%;background:#04160B;color:#3DDC84;display:grid;place-items:center;margin:0 auto 12px;font-size:32px">✓</div>Connecté</div>';
+  fx.appendChild(face); fx.style.zIndex = 30;
+  const P = 'perspective(1100px) ';
+  $$('.fc, .brand').forEach(e => e.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: 'forwards' }));
+  card.animate([{ transform: 'translateY(-50%) ' + P + 'rotateY(0)' }, { transform: 'translateY(-50%) ' + P + 'rotateY(90deg)' }], { duration: 230, easing: 'cubic-bezier(.5,0,1,1)', fill: 'forwards' });
+  face.animate([{ transform: P + 'rotateY(-90deg)' }, { transform: P + 'rotateY(-90deg)', offset: .5 }, { transform: P + 'rotateY(0)' }], { duration: 460, easing: 'cubic-bezier(0,0,.2,1)', fill: 'forwards' });
+  await wait(620);
+  showDash(); dash.style.zIndex = 25;
+  face.animate([{ transform: 'none', opacity: 1 }, { transform: 'scale(.9) translateY(-40px)', opacity: 0 }], { duration: 300, easing: EASE, fill: 'forwards' });
+  cascade(180);
+  await dash.animate([{ transform: 'translateY(100%)' }, { transform: 'translateY(-2.5%)', offset: .75 }, { transform: 'none' }], { duration: 480, easing: 'cubic-bezier(.2,.9,.3,1)' }).finished;
+  face.remove();
+}
+const RUN = { 1: t1, 2: t2, 3: t3, 4: t4, 5: t5, 6: t6, 7: t7 };
+$('#bar').onclick = async e => {
+  const b = e.target.closest('button'); if (!b || busy) return;
+  busy = true;
+  $$('.bar button').forEach(x => x.classList.toggle('on', x === b));
+  $('#cap').innerHTML = CAPS[b.dataset.t];
+  reset(); $('#blogo').style.visibility = ''; card.style.visibility = '';
+  await wait(500);
+  try { await RUN[b.dataset.t](); } finally { busy = false; }
+};
+</script>
+</body>
+</html>
