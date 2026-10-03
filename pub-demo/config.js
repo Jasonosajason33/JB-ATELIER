@@ -1,0 +1,6 @@
+window.APP_CONFIG = {
+  SUPABASE_URL: '',
+  SUPABASE_ANON_KEY: '',
+  APP_NAME: 'JB Flow',
+  APP_VERSION: 'V26.186'
+};

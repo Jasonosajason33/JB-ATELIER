@@ -1,13 +1,6 @@
-<!doctype html>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="robots" content="noindex, nofollow">
 <title>JB Flow Démo</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist:wght@400;500;600;700&display=swap">
-<script>/* Bac à sable JB Flow : ?role=collab|rc|manager choisit le profil fictif et lance la visite guidée */
-(function () { try { var r = new URLSearchParams(location.search).get('role'); var u = { collab: 'lea@demo.local', rc: 'hugo@demo.local', manager: 'admin@demo.local' }[r];
-  if (u && !sessionStorage.getItem('jbflow-sandbox-role')) { sessionStorage.setItem('jbflow-sandbox-role', r); sessionStorage.setItem('planif-demo-user', u); if (r === 'manager') sessionStorage.setItem('planif-view-as', 'manager'); localStorage.setItem('jbflow-tour-auto', '1'); location.hash = r === 'manager' ? '#/dashboard' : '#/today'; } } catch (e) { } })();</script>
 <script>document.documentElement.dataset.ui = "v2";
   try { if (!sessionStorage.getItem('planif-demo-user')) sessionStorage.setItem('planif-view-as', 'manager'); sessionStorage.setItem('planif-demo-user', sessionStorage.getItem('planif-demo-user') || 'admin@demo.local'); var th = localStorage.getItem('planif-theme') || 'clair'; document.documentElement.dataset.theme = th === 'clair' || th === 'iris' ? 'clair' : 'signature'; if (th === 'nuit') document.documentElement.dataset.variant = 'aurora'; if (th === 'iris') document.documentElement.dataset.variant = 'iris'; var sd = localStorage.getItem('planif-side'); if ((sd === 'dark' || sd === 'color') && th !== 'iris') document.documentElement.dataset.side = sd; var ac = localStorage.getItem('planif-accent'); if (ac) document.documentElement.dataset.accent = ac; document.documentElement.dataset.motion = 'always'; } catch (e) { document.documentElement.dataset.theme = 'clair'; }
 </script>
@@ -16,14 +9,12 @@
 <div id="sheet-root"></div>
 <div id="toasts" aria-live="polite"></div>
 <script>/* Démo : on se place autour du 15 du mois (milieu de production), un jour ouvré */ (function () { var n = new Date(), d = new Date(n.getFullYear(), n.getMonth(), 15, 12); if (d.getDay() === 6) d.setDate(14); if (d.getDay() === 0) d.setDate(16); window.JBFLOW_DEMO_TODAY = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();</script>
-
-<script src="config.js" charset="utf-8"></script>
-<script>/* Bac à sable : jamais de connexion à la base du cabinet, données fictives dans ce navigateur uniquement */ window.APP_CONFIG.SUPABASE_URL = ''; window.APP_CONFIG.SUPABASE_ANON_KEY = '';</script>
-<script src="engine.js" charset="utf-8"></script>
-<script src="fiscal.js" charset="utf-8"></script>
-<script src="store.js" charset="utf-8"></script>
-<script src="app.js" charset="utf-8"></script>
-<script src="ui-v2.js" charset="utf-8"></script>
+<script src="config.js"></script>
+<script src="engine.js"></script>
+<script src="fiscal.js"></script>
+<script src="store.js"></script>
+<script src="app.js"></script>
+<script src="ui-v2.js"></script>
 <script>
 /* Démo : jeu de données d'exemple (collaboratrice Léa, apprentie Inès, clients en retard de pièces), créé une seule fois dans ce navigateur */
 (function () {
@@ -38,7 +29,7 @@
       var db = JSON.parse(localStorage.getItem(K)); if (!db || !db.app_users || !db.app_users.length) return;
       var adm = db.app_users[0], now = new Date(window.JBFLOW_DEMO_TODAY + 'T12:00:00'), m = iso(now).slice(0, 7), past = function (k) { var d = new Date(now); d.setDate(d.getDate() - k); return iso(d); };
       var nm = new Date(now.getFullYear(), now.getMonth() + 1, 1), next = iso(nm).slice(0, 7);
-      localStorage.setItem('planif-theme-chosen:lea@demo.local', '1'); localStorage.setItem('planif-theme-chosen:admin@demo.local', '1');
+      localStorage.setItem('planif-theme', 'clair'); localStorage.setItem('planif-theme-chosen:lea@demo.local', '1'); localStorage.setItem('planif-theme-chosen:admin@demo.local', '1');
       db.app_users.push(Object.assign({}, adm, { id: 'u-eva', email: 'lea@demo.local', name: 'Léa Moreau', role: 'collab', collaborator_id: 'k-eva', active: true }));
       db.collaborators.push({ id: 'k-eva', name: 'Léa', kind: 'collab', daily_capacity_min: 420, work_days: [1, 2, 3, 4, 5], active: true, version: 1, color: '#d946ef' });
       var pres = []; for (var i = 0; i < 60; i++) { var d = new Date(now); d.setDate(d.getDate() + i); if ([1, 2, 3].indexOf(d.getDay()) >= 0) pres.push(iso(d)); }

@@ -1,4 +1,4 @@
-# JB Flow — fichier de reprise (état au 4 octobre 2026, version 26.185)
+# JB Flow — fichier de reprise (état au 3 octobre 2026, version 26.186)
 
 Coller ce fichier au début d'une nouvelle session Claude (cloud ou locale) pour reprendre le travail sans perte.
 Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraison, vocabulaire, module Révision, film).
@@ -7,7 +7,8 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - Application statique `app/` mise en ligne sur Cloudflare (https://jbflow.app-flow.workers.dev) depuis le dépôt GitHub « JB-FLOW-AUTOMATIC » (commande de build : `node build.js`). Base de données Supabase.
 - Sources : `src/app/NN-*.js`, assemblées dans `app/app.js` par `build.ps1` (PC sans Node) ou `build.js`.
 - Démo publiée (données fictives) : https://claude.ai/artifact/PaW1TkQGP4JfcWnmWqchyj — page `pub-demo/jbflow-demo.html`.
-- Tests du moteur : `app/tests/moteur.html` (7 tests, tous verts en 26.185).
+- Tests du moteur : `app/tests/moteur.html` (7 tests, tous verts en 26.186).
+- Dépôt de travail : GitHub « JB-ATELIER » (branche `claude/new-session-hylho7`) contient `app/`, `src/`, `supabase/`, `pub-demo/` et `sim/preview-cards.css`. Le dépôt « JB-FLOW-AUTOMATIC » (mis en ligne par Cloudflare) était resté en 26.45 au 3 octobre.
 - Outils de test automatisés (Edge sans fenêtre) : `sim/build-steps.ps1` + `sim/cdp-steps.ps1` ; aides `sim/crypto-helpers.js`.
 
 ## Règles permanentes
@@ -21,7 +22,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - Aperçu « cartes de tâches fines + coche minimaliste » : visible seulement dans la démo (`sim/preview-cards.css`, ajouté à `pub-demo/design-effects.css` à chaque copie) — à valider avant intégration.
 - Après déploiement de la 26.181 et plus : ouvrir l'application avec le compte administrateur, dans sa propre vue, pour nettoyer automatiquement les doublons de tableaux de bord déjà enregistrés.
 
-## Dernières versions (26.176 → 26.185)
+## Dernières versions (26.176 → 26.186)
 - 26.176 : système d'animation commun aux 4 thèmes (`app/design-motion.css`, `src/app/021-mouvement.js` : FAST 140 / MEDIUM 200 / SLOW 280 ms, courbe cubic-bezier(.22, 1, .36, 1)).
 - 26.177 → 26.180 : cartes affinées (TVA, alertes, IS / CFE / CVAE, réceptions ajustées, historique, Dashboard Clients, fenêtre du Suivi TVA) ; effet de clic « ripple » (380 ms) ; doublons de tableaux de bord corrigés.
 - 26.181 : audit — plus aucune action ne gonfle un planning (temps d'un dossier scindé, demandes d'informations, réception partielle, génération du mois, création / import de dossiers).
@@ -29,6 +30,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - 26.183 : glisser une tâche contre le bord de l'écran pour changer de semaine.
 - 26.184 : orange vif à la place du bronze dans les jauges.
 - 26.185 : aucune alerte ni phrase de remplissage sous 108 % (seuil `ALERT_PCT` dans `src/app/02-rendu-composants.js`, toujours passer par `alertsOf`).
+- 26.186 : onglet Planning en « cockpit » d'équipe (`src/app/071-planning-cockpit.js`, styles `app/design-planning.css`, lien ajouté dans `index.html`, `demo.html` et la démo publiée). 4 indicateurs cliquables (à traiter aujourd'hui, en retard, à recevoir, terminé), date + Jour / Semaine / Mois, filtres (équipe ou une personne, type, dossier, statut, recherche), frise horaire 08:00 → 18:00 de toute l'équipe (heures = enchaînement depuis `day_start`, comme avant), ligne de l'heure actuelle, tâche « en cours » = sous cette ligne (affichage seulement), ligne « À affecter » (non planifiées, à glisser sur une personne), semaine de l'équipe, mois = frise de l'onglet Équipe ; cartes Activité / Tâches à affecter / À surveiller / Synthèse ; barres de remplissage à 3 états (< 90 % vert, 90–100 % orange, > 100 % rouge) sans pourcentage ; « surcharge » seulement pour le manager et au-delà de 108 % ; « Replanifier le mois » devient « Optimiser le planning » dans le Planning (résumé, propositions, rien sans « Appliquer » ; Pilotage inchangé). Aucune migration Supabase.
 
 ## Film de présentation (v3 du 1er octobre 2026 — à reprendre plus tard)
 - But : présenter JB Flow aux supérieurs. Lien : https://claude.ai/artifact/J1CXu3csSo28ST8YGcrTpH (v3 publiée).

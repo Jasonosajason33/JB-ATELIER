@@ -1,0 +1,24 @@
+/* APERÇU (non livré) : cartes de tâches affinées — une ligne quand c'est possible, coche minimaliste */
+#view .tasks > .swipe > .task:not(.mini), #view .tasks > .task:not(.mini) { padding: 5px 10px 5px 16px !important; min-height: 42px !important; border-radius: 12px; gap: 10px; grid-template-columns: auto minmax(0, 1fr) auto; }
+#view .tasks > .swipe > .task.nt:not(.mini), #view .tasks > .task.nt:not(.mini) { grid-template-columns: minmax(0, 1fr) auto; }
+#view .tasks .task:not(.mini)::before { left: 6px; top: 10px; bottom: 10px; width: 3px; }
+#view .tasks .swipe { border-radius: 12px; }
+#view .tasks .task:not(.mini) > div:not(.time) { display: flex; align-items: center; flex-wrap: wrap; column-gap: 10px; row-gap: 1px; min-width: 0; }
+#view .tasks .task:not(.mini) .time { font-size: 12.5px; min-width: 38px; font-weight: 600; }
+#view .tasks .task:not(.mini) .tname { order: 1; font-size: 14px !important; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; }
+#view .tasks .task:not(.mini) .done-strip { order: 2; margin: 0; padding: 0 8px; gap: 4px; font-size: 11px; line-height: 18px; border-radius: 999px; white-space: nowrap; }
+#view .tasks .task:not(.mini) .done-strip svg { width: 11px; height: 11px; }
+#view .tasks .task:not(.mini) .done-strip span { font-weight: 500; opacity: .8; }
+#view .tasks .task:not(.mini) .meta { order: 3; margin-top: 0 !important; font-size: 12px; gap: 6px; }
+#view .tasks .task:not(.mini) .meta > * { white-space: nowrap; }
+#view .tasks .task:not(.mini) .badge { font-size: 11px; line-height: 16px; padding: 0 6px !important; border-radius: 6px; }
+#view .tasks .task:not(.mini) .badge svg { width: 10px; height: 10px; }
+#view .tasks .task.done:not(.mini) { background: color-mix(in srgb, var(--surface-2) 70%, transparent); box-shadow: none; }
+#view .tasks .task.done:not(.mini) .tname { font-weight: 500; }
+/* Coche : anneau fin de 20 px (zone de clic conservée à 36 px), coche verte discrète une fois faite */
+#view .task .check { position: relative; width: 20px !important; height: 20px !important; border: 1.5px solid color-mix(in srgb, var(--muted) 50%, transparent); background: transparent; box-shadow: none; }
+#view .task .check::after { content: ""; position: absolute; inset: -8px; border-radius: 50%; }
+#view .task .check svg { width: 11px; height: 11px; stroke-width: 3; }
+#view .task .check:hover:not(:disabled) { border-color: var(--ok); color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, transparent); }
+#view .task.done .check { background: color-mix(in srgb, var(--ok) 16%, transparent); border-color: transparent; color: var(--ok); }
+#view .task.done .check:hover:not(:disabled) { background: color-mix(in srgb, var(--ok) 24%, transparent); }

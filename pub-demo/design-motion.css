@@ -1,0 +1,187 @@
+/* =====================================================================
+   JB Flow — système de mouvement commun (V26.176), pour les quatre thèmes
+   Une seule source pour les durées et la courbe ; les mêmes valeurs existent en JavaScript
+   (FX dans src/app/021-mouvement.js, window.JBFX pour ui-v2.js) :
+     FAST   140 ms : survol, appui, petits changements d'état
+     MEDIUM 200 ms : onglets, fenêtres, données qui changent
+     SLOW   280 ms : grands déplacements (menu, feuille sur téléphone, barres)
+     EASING cubic-bezier(.22, 1, .36, 1) : entrée franche, arrivée douce, sans rebond
+   Ce qui bouge n'utilise que opacity et transform ; rien ne bloque la saisie ;
+   « Animations : réduites » (ou le réglage de l'appareil) coupe tout.
+   Chargé en dernier : harmonise les animations des autres feuilles sans toucher
+   aux couleurs, aux formes ni à la typographie.
+   ===================================================================== */
+:root, html:root[data-ui] {
+  --fast: 140ms; --medium: 200ms; --slow: 280ms;
+  --easing: cubic-bezier(.22, 1, .36, 1);
+  --easing-exit: cubic-bezier(.4, 0, 1, 1);
+  --stagger: 30ms;
+  --ripple: 380ms; /* effet de clic (V26.179) */
+  /* Anciens noms ramenés sur les mêmes valeurs : plus aucun rebond nulle part */
+  --ease: var(--easing); --spring: var(--easing); --dur: var(--medium);
+  --m-ease: var(--easing); --m-ease-exit: var(--easing-exit); --m-micro: 120ms; --m-btn: var(--fast);
+  --m-tab: var(--medium); --m-in: var(--medium); --m-screen: var(--medium); --m-panel: var(--medium);
+  --m-exit: var(--fast); --m-stagger: var(--stagger);
+}
+
+@keyframes fxScreenIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fxTabIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes fxDataIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes fxUpd { from { opacity: .55; } to { opacity: 1; } }
+@keyframes fxFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fxFadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes fxModalIn { from { opacity: 0; transform: translateY(5px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes fxModalOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(4px) scale(.98); } }
+@keyframes fxPanelIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+@keyframes fxPanelOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(8px); } }
+@keyframes fxSheetUp { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes fxSheetDown { from { transform: none; } to { transform: translateY(100%); } }
+@keyframes fxPop { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes fxPopOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-4px) scale(.98); } }
+@keyframes fxToastIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes fxToastOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-4px); } }
+@keyframes fxCheck { from { transform: scale(.85); } to { transform: none; } }
+@keyframes fxSpot { from { opacity: .5; transform: scale(1.04); } to { opacity: 1; transform: none; } }
+@keyframes fxRipple { from { opacity: .95; transform: scale(.35); } to { opacity: 0; transform: scale(1.2); } }
+
+/* ---------- Changement d'écran : menu et en-tête fixes ; seul le contenu sort (60 ms) puis entre ----------
+   Le titre arrive d'abord, puis les cartes en cascade de 30 ms (5 niveaux au plus), 6 px au plus, 200 ms. */
+#view { transition: opacity 120ms var(--easing); }
+#view.v-out { opacity: 0; transition: opacity 60ms var(--easing-exit); }
+#view.enter .anim-in { animation: fxScreenIn var(--medium) var(--easing) both; animation-delay: calc(min(var(--i, 0), 4) * var(--stagger) - var(--fx-el, 0ms)); }
+#view.enter :is(.vb .fill, .mbars i, .funnel .ft, .bar > i, .segbar i, .pj-todo) { animation-duration: var(--slow); animation-timing-function: var(--easing); animation-delay: calc(80ms - var(--fx-el, 0ms)); }
+#view.enter :is(.ring circle + circle, .donut-c circle + circle) { animation-duration: calc(var(--slow) * 1.5); animation-timing-function: var(--easing); animation-delay: calc(80ms - var(--fx-el, 0ms)); }
+html:root[data-ui] #view .kpi-ring .p { animation-duration: calc(var(--slow) * 1.5); animation-timing-function: var(--easing); }
+html:root[data-ui] #view:not(.enter) .kpi-ring .p { animation: none; } /* l'anneau ne se redessine pas à chaque mise à jour */
+
+/* ---------- Changement d'onglet (Jour / Semaine / Mois, onglets du Pilotage…) : les commandes restent en place,
+   seul le contenu dessous apparaît (fondu + 4 px, 200 ms) ---------- */
+#view.tab-in > :not(.row):not(.chips):not(.seg):not(.print-title):not(.page-h):not(.pilot-tabs) { animation: fxTabIn var(--medium) var(--easing) both; animation-delay: calc(0ms - var(--fx-el, 0ms)); }
+
+/* ---------- Données qui changent (planning, filtres, listes, « Mes clients ») : la structure ne bouge pas ;
+   nouveaux éléments : fondu + 4 px, cascade très légère ; élément modifié : courte transition d'état ----------
+   (déplacements : glissement calculé en JavaScript depuis l'ancienne place) */
+#view .fx-in, #results .fx-in, #rec-home .fx-in { animation: fxDataIn var(--medium) var(--easing) both; animation-delay: calc(var(--fx-i, 0) * 12ms); }
+#view .fx-upd { animation: fxUpd var(--medium) var(--easing); }
+
+/* Plus d'apparition au défilement : le contenu est là tout de suite (ne ralentit jamais la lecture) */
+@supports (animation-timeline: view()) {
+  html[data-ui="v2"][data-ui]:not([data-theme="nuit"]):not([data-motion="reduced"]) :is(.card:not(.collab-card), .frame, .section-t) { animation: none; }
+}
+
+/* ---------- Menu latéral : stable ; l'élément actif change tout de suite (aucun glissement au changement de page) ----------
+   Ouverture du rail au survol : 220 ms avec la courbe commune, libellés en fondu juste après ; fermeture immédiate.
+   (La largeur reste animée : une transformation ferait glisser les icônes, qui doivent rester immobiles.) */
+@media (min-width: 801px) {
+  html:root[data-ui] .side { transition: width 220ms var(--easing), box-shadow 220ms var(--easing); }
+  html:root[data-ui] .shell { transition: grid-template-columns 220ms var(--easing); }
+  html:root[data-ui] .shell:not(.pinned) .side:is(:hover, :has(:focus-visible)) :is(.lbl, .count, .nav-label, .collapse-btn) { opacity: 1; transition: opacity var(--fast) var(--easing) 60ms; }
+  html:root[data-ui] .shell:not(.pinned) .side:not(:hover):not(:has(:focus-visible)) :is(.lbl, .count, .nav-label, .collapse-btn) { opacity: 0; transition: none; }
+}
+@media (max-width: 800px) {
+  html:root[data-ui] .side { transition: transform var(--slow) var(--easing); }
+  html:root[data-ui] .side-backdrop { transition: opacity var(--medium) var(--easing); }
+  html:root[data-ui] .bottom-nav .ind { transition: transform var(--medium) var(--easing), opacity var(--fast) var(--easing); }
+  html:root[data-ui] :is(.bottom-nav a, .bottom-nav button) { transition: color var(--fast) var(--easing); }
+}
+html:root[data-ui] .side a.nav { transition: background-color var(--fast) var(--easing), color var(--fast) var(--easing), transform var(--fast) var(--easing); }
+
+/* ---------- Cartes interactives : soulèvement de 1 à 2 px au survol (140 ms), légère compression à l'appui ---------- */
+html:root[data-ui] :is(a.kpi, .kpi[data-act], .kpi-click, .card.collab-card, .tp-card, .task, .risk-row, .up-row[data-act], .alert, .rec, .info-row[data-act], .wk-day, .mcell, .gbar) {
+  transition: transform var(--fast) var(--easing), box-shadow var(--fast) var(--easing), border-color var(--fast) var(--easing), background-color var(--fast) var(--easing), opacity var(--fast) var(--easing);
+}
+@media (hover: hover) {
+  html:root[data-ui] :is(a.kpi, .kpi[data-act], .kpi-click, .tp-card):hover { transform: translateY(-2px); }
+  html:root[data-ui] :is(.card.collab-card, .task:not(.mini), .risk-row, .up-row[data-act], .alert, .info-row[data-act], .wk-day, .mcell, .gbar):hover { transform: translateY(-1px); }
+}
+html:root[data-ui] :is(a.kpi, .kpi[data-act], .kpi-click, .card.collab-card, .tp-card):active { transform: scale(.99); transition-duration: 80ms; }
+html:root[data-ui] :is(.task, .risk-row, .up-row[data-act], .alert, .rec, .info-row[data-act], .wk-day, .mcell, .gbar):active { transform: scale(.985); transition-duration: 80ms; }
+
+/* ---------- Boutons : survol en 140 ms, appui à 0,985, retour à 1 au relâchement ---------- */
+html:root[data-ui] :is(.btn, .chip, .seg button, .theme-switch button, .ir button, .x, .side-btn, button.badge.act, .side-search, .side-rec, .me-list button, .me-out, .lg-ghost, .lg-user, .acc-sw button) {
+  transition-property: background-color, background, border-color, color, box-shadow, transform, translate, opacity, filter;
+  transition-duration: var(--fast); transition-timing-function: var(--easing);
+}
+html:root[data-ui] :is(.btn, .chip, .seg button, .theme-switch button, .ir button, button.badge.act, .me-list button, .me-out, .lg-ghost, .lg-user):active:not(:disabled) { transform: scale(.985); transition-duration: 70ms; }
+html:root[data-ui] :is(.x, .side-btn, .btn.icon):active:not(:disabled) { transform: scale(.96); transition-duration: 70ms; }
+html:root[data-ui] .logo-btn { transition: transform var(--fast) var(--easing); }
+html:root[data-ui] .logo-btn:hover { transform: scale(1.04); }
+html:root[data-ui] .logo-btn:active { transform: scale(.96); }
+html:root[data-ui] .check { transition: background-color var(--fast) var(--easing), border-color var(--fast) var(--easing), color var(--fast) var(--easing), box-shadow var(--fast) var(--easing), transform var(--fast) var(--easing); }
+html:root[data-ui] input[type=checkbox] { transition: background-color var(--fast) var(--easing), border-color var(--fast) var(--easing), box-shadow var(--fast) var(--easing); }
+
+/* Tâche terminée : la case se marque sans rebond, l'onde reste courte */
+html:root[data-ui] .task.just-done .check { animation: fxCheck var(--medium) var(--easing) both; }
+html:root[data-ui] .task.just-done .check path { animation: draw var(--slow) 40ms var(--easing) forwards; }
+html:root[data-ui]:not([data-motion="reduced"]) .task.just-done { animation: fxSettle var(--slow) 120ms var(--easing) both; }
+html:root[data-ui]:not([data-motion="reduced"]) .task.just-done::after { animation-duration: 420ms; animation-timing-function: var(--easing); }
+html:root[data-ui] .swipe-bg :is(.l, .r) { transition: opacity var(--fast) var(--easing), transform var(--medium) var(--easing); }
+
+/* ---------- Fenêtres : fond en léger fondu ; fenêtre 0,98 → 1 et 5 px → 0 en 200 ms ;
+   fermeture inverse, un peu plus rapide (140 ms) ; panneaux latéraux : 10 px depuis la droite ---------- */
+html:root[data-ui] .overlay.anim { animation: fxFade var(--medium) var(--easing) both; }
+html:root[data-ui] .overlay.anim > .sheet { animation: fxPanelIn var(--medium) var(--easing) both; }
+html:root[data-ui] .overlay.anim.center > .sheet { animation: fxModalIn var(--medium) var(--easing) both; }
+html:root[data-ui] .overlay.anim.swap { animation: none; } /* fenêtre suivante ou précédente : le fond reste en place */
+html:root[data-ui] .overlay.closing { animation: fxFadeOut var(--fast) var(--easing-exit) both; pointer-events: none; }
+html:root[data-ui] .overlay.closing > .sheet { animation: fxPanelOut var(--fast) var(--easing-exit) both; }
+html:root[data-ui] .overlay.closing.center > .sheet { animation: fxModalOut var(--fast) var(--easing-exit) both; }
+@media (max-width: 800px) {
+  html:root[data-ui] :is(.overlay.anim, .overlay.anim.center) > .sheet { animation: fxSheetUp var(--slow) var(--easing) both; }
+  html:root[data-ui] :is(.overlay.closing, .overlay.closing.center) > .sheet { animation: fxSheetDown var(--medium) var(--easing-exit) both; }
+}
+html:root[data-ui] #app { transition: transform var(--medium) var(--easing), filter var(--medium) var(--easing); }
+html:root[data-ui] :is(.cmdk-ov, .tp-overlay) { animation: fxFade var(--medium) var(--easing) both; }
+html:root[data-ui] :is(.cmdk, .tp-box) { animation: fxModalIn var(--medium) var(--easing) both; }
+html:root[data-ui] .tp-overlay.out { opacity: 0; transition: opacity var(--fast) var(--easing-exit); }
+html:root[data-ui] .cmdk-ov.closing { animation: fxFadeOut var(--fast) var(--easing-exit) both; pointer-events: none; }
+html:root[data-ui] :is(.v2-menu, .th-pop) { animation: fxPop var(--fast) var(--easing) both; }
+html:root[data-ui] .me-card { animation: fxPop var(--medium) var(--easing) both; }
+html:root[data-ui] .me-card.out { animation: fxPopOut var(--fast) var(--easing-exit) both; }
+html:root[data-ui] .v2-tip { transition: opacity var(--fast) var(--easing), transform var(--fast) var(--easing); }
+html:root[data-ui] .tip { transition: opacity var(--fast) var(--easing), transform var(--fast) var(--easing); }
+
+/* ---------- Notifications : entrée légère par le haut (200 ms), sortie plus rapide (140 ms), sans rebond ---------- */
+html:root[data-ui] .toast { animation: fxToastIn var(--medium) var(--easing) both; }
+html:root[data-ui] .toast.out { animation: fxToastOut var(--fast) var(--easing-exit) both; pointer-events: none; }
+
+/* ---------- Glisser-déposer : la carte saisie suit le curseur, mise en avant (échelle 1,02, ombre discrète) ;
+   à sa place reste une empreinte ; au dépôt elle glisse en 200 ms jusqu'à sa position finale (JavaScript) ---------- */
+.fx-drag-img { position: fixed !important; left: -10000px !important; top: 0 !important; margin: 0 !important; padding: 10px; pointer-events: none; background: none; }
+.fx-drag-img > * { zoom: 1.02; margin: 0 !important; opacity: 1 !important; transform: none !important; animation: none !important; background-color: var(--surface); box-shadow: 0 10px 22px -14px rgba(17, 19, 15, .4), 0 0 0 1.5px color-mix(in srgb, var(--accent) 50%, transparent) !important; }
+html:root[data-ui] .task.dragging { opacity: .4; transform: scale(.98); transition: opacity var(--fast) var(--easing), transform var(--fast) var(--easing); }
+html:root[data-ui] .day-col { transition: background-color var(--fast) var(--easing), box-shadow var(--fast) var(--easing); }
+
+/* ---------- Démo guidée : curseur de démonstration (s'ajoute au vrai curseur, ne le remplace jamais) ----------
+   Déplacement fluide, courte pause, clic discret (cercle de 300 ms), puis l'action. */
+.fx-cursor { position: fixed; left: 0; top: 0; z-index: 3; width: 0; height: 0; pointer-events: none; opacity: 0; transition: opacity var(--fast) var(--easing); will-change: transform; }
+.fx-cursor.on { opacity: 1; }
+.fx-cursor svg { position: absolute; left: -2px; top: -1px; width: 22px; height: 22px; overflow: visible; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .35)); transform-origin: 2px 1px; transition: transform var(--fast) var(--easing); }
+.fx-cursor svg path { fill: var(--accent); stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: round; }
+.fx-cursor.press svg { transform: scale(.88); transition-duration: 70ms; }
+.fx-cur-ring { position: absolute; left: -15px; top: -15px; width: 30px; height: 30px; border-radius: 50%; border: 2px solid #ffd43b; box-shadow: 0 0 0 3px rgba(255, 212, 59, .25); opacity: 0; pointer-events: none; animation: fxRipple 300ms var(--easing) both; }
+#tour { transition: opacity var(--medium) var(--easing); }
+#tour .tour-spot { transition: left var(--slow) var(--easing), top var(--slow) var(--easing), width var(--slow) var(--easing), height var(--slow) var(--easing); }
+#tour .tour-spot.zoom { animation: fxSpot var(--slow) var(--easing); }
+#tour .tour-tgt { transition: left var(--slow) var(--easing), top var(--slow) var(--easing), width var(--slow) var(--easing), height var(--slow) var(--easing), opacity var(--fast) var(--easing); }
+#tour .tour-card { transition: opacity var(--medium) var(--easing), transform var(--medium) var(--easing) !important; }
+#tour .tour-card.swap { transform: translateY(4px) scale(.98); transition: opacity var(--fast) var(--easing-exit), transform var(--fast) var(--easing-exit) !important; }
+#tour .tour-bar i { transition: width var(--slow) var(--easing); }
+
+/* ---------- V26.179 : effet de clic — petit cercle sous le pointeur, qui s'agrandit et s'efface (380 ms) ;
+   ne capte aucun clic, aux couleurs du thème, discret ---------- */
+@keyframes fxRippleClick { from { transform: scale(.2); opacity: .95; } 60% { opacity: .5; } to { transform: scale(1); opacity: 0; } }
+.fx-ripple { position: fixed; z-index: 2147483000; width: 36px; height: 36px; margin: -18px 0 0 -18px; border-radius: 50%; pointer-events: none;
+  background: color-mix(in srgb, var(--accent, #4F6BED) 16%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent, #4F6BED) 55%, transparent);
+  animation: fxRippleClick var(--ripple) var(--easing) forwards; will-change: transform, opacity; }
+
+/* ---------- Écran de connexion : plus court, la saisie est disponible tout de suite ---------- */
+html:root[data-ui] .lg-in { animation-duration: var(--slow); animation-timing-function: var(--easing); animation-delay: calc(var(--d, 0) * 40ms + 40ms); }
+
+/* ---------- Moins d'animations (Paramètres › Apparence, ou réglage de l'appareil) : tout est immédiat ---------- */
+[data-motion="reduced"] #view.v-out { opacity: 1; }
+[data-motion="reduced"] :is(#view, #results, #rec-home) * { animation-delay: 0s !important; }
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="always"]) #view.v-out { opacity: 1; }
+  :root:not([data-motion="always"]) :is(#view, #results, #rec-home) * { animation-delay: 0s !important; }
+}

@@ -157,12 +157,12 @@
     return Object.assign({}, res, { scoped: true, changes: res.changes.filter(c => vis(c.id)), moved: res.moved.filter(x => vis(x.id)), unplanned: res.unplanned.filter(x => vis(x.id)),
       problems: res.problems.filter(pb => !pb.production_id || pids.has(pb.production_id)), lockedCount: mine.filter(t => t.locked && !t.done).length, doneCount: mine.filter(t => t.done).length });
   }
-  async function openReplan(m) {
+  async function openReplan(m, opt) { // V26.186 : opt = ouvert par « Optimiser le planning » (onglet Planning)
     if (!canReplan()) return;
     await poll(true);
     const nFix = await fixDueDates(m, isManager() ? null : t => canSeeCollab(t.collaborator_id));
     if (nFix) toast(nFix + ' échéance(s) tombant un week-end ou un jour férié reportée(s) au premier jour ouvré suivant.', 'ok', null, 5000);
-    openSheet({ type: 'replan', month: m, result: replanFor(m, false), force: false });
+    openSheet({ type: 'replan', month: m, result: replanFor(m, false), force: false, opt: !!opt, stats: opt ? pcOptStats(m) : null });
   }
   async function applyReplan() {
     const s = S.sheet; if (!s || s.type !== 'replan') return;

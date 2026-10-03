@@ -1,0 +1,103 @@
+/* =====================================================================
+   JB Flow — 4e thème « Iris » (V26.175)
+   Base du thème Clair (data-theme="clair" + data-variant="iris") : fond lavande très pâle, cartes blanches
+   pleines aux ombres douces, accent pervenche, touches citron ; aucun verre, aucun halo, aucun reflet.
+   V26.176 : les animations ne sont plus propres à Iris — elles forment le système de mouvement commun
+   à tous les thèmes (design-motion.css et src/app/021-mouvement.js). Ce fichier ne garde que l'apparence.
+   ===================================================================== */
+
+/* ---------- Couleurs et formes ---------- */
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] {
+  --acc: #4F6BED;
+  --bg: #EEF0F8; --surface: #FFFFFF; --surface-2: #F5F6FC; --frame: #F3F4FA;
+  --border: rgba(31, 41, 92, .07); --border-strong: rgba(31, 41, 92, .14);
+  --text: #15172E; --muted: #6A6F8C; --faint: #A4A8C2;
+  --ink: #15172E; --ink-text: #FFFFFF;
+  --accent: #4F6BED; --accent-ink: #FFFFFF; --accent-soft: #E9EDFE;
+  --pop: #D4EF5A; --pop-ink: #283000; --pop-soft: #F3FAD3;
+  --ok: #16A34A; --ok-soft: #E4F6EB; --warn: #DD8A00; --warn-soft: #FFF3DD;
+  --bad: #E5484D; --bad-soft: #FDEDED; --info: #4F6BED; --info-soft: #E9EDFE;
+  --k-production: #4F6BED; --k-tenue: #4F6BED; --k-lettrage: #9B7BF2; --k-tva: #14B8A6; --k-info: #DD8A00; --k-dashboard: #9B7BF2;
+  --side-bg: #FFFFFF; --side-text: #5E637F; --side-strong: #15172E; --side-muted: #A4A8C2;
+  --side-hover: #F3F5FD; --side-active: #4F6BED; --side-active-text: #FFFFFF; --side-border: rgba(31, 41, 92, .07);
+  --nav-bg: #FFFFFF; --nav-text: #7A7F9C; --nav-active: #4F6BED; --nav-active-text: #FFFFFF;
+  --hatch: rgba(31, 41, 92, .14); --track: #ECEEF7;
+  --r-xl: 22px; --r-lg: 18px; --r-md: 14px; --r-sm: 10px;
+  --shadow: 0 1px 2px rgba(22, 28, 64, .04);
+  --shadow-lg: 0 24px 60px -24px rgba(22, 28, 64, .25);
+  --ir-shadow: 0 1px 2px rgba(22, 28, 64, .04), 0 10px 28px -18px rgba(22, 28, 64, .18);
+  --ir-shadow-hover: 0 1px 2px rgba(22, 28, 64, .05), 0 14px 32px -16px rgba(22, 28, 64, .22);
+  background: var(--bg);
+}
+/* Fond uni : pas de halos animés */
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] body::before, html[data-ui="v2"][data-theme="clair"][data-variant="iris"] body::after { content: none; display: none; animation: none; }
+
+/* Cartes : blanc plein, bordure fine, ombre douce, sans reflet ni verre */
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] :is(.card, .kpi, .frame) { background: #FFFFFF; border: 1px solid var(--border); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: var(--ir-shadow); border-radius: 20px; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] :is(.card, .kpi, .frame)::before { background: none; opacity: 0; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .ibox { background: var(--accent-soft); color: var(--accent); border: 0; box-shadow: none; border-radius: 10px; }
+/* Carte « Reste à faire » : pleine, pervenche, comme la carte « AI Copilot » de la maquette */
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .kpi.hero { position: relative; overflow: hidden; background: linear-gradient(150deg, #5A76F2, #4560E6); color: #FFFFFF; border-color: transparent; box-shadow: 0 16px 32px -18px rgba(79, 107, 237, .75); }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .kpi.hero::after { content: ""; position: absolute; right: -46px; top: -46px; width: 150px; height: 150px; border-radius: 50%; background: rgba(255, 255, 255, .12); pointer-events: none; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .kpi.hero :is(.v, .v small, .kpi-h, .foot) { color: #FFFFFF; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .kpi.hero .foot { opacity: .85; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .kpi.hero .ibox { background: rgba(255, 255, 255, .18); color: #FFFFFF; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .kpi.hero .bar { background: rgba(255, 255, 255, .22) !important; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .kpi.hero .bar i { background: var(--pop) !important; }
+
+/* Menu latéral : blanc, élément actif pervenche pâle */
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .side { background: #FFFFFF; -webkit-backdrop-filter: none; backdrop-filter: none; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(22, 28, 64, .04), 0 18px 40px -28px rgba(22, 28, 64, .22); }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .side a.nav.on { background: var(--accent-soft); color: var(--accent); box-shadow: none; font-weight: 600; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .side a.nav.on svg { color: var(--accent); }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] img[src*="logo-"]:not(.lg-mono) { filter: hue-rotate(95deg) saturate(1.15) !important; }
+
+/* Tâches, colonnes du planning */
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .task { background: #FFFFFF; border-color: var(--border); box-shadow: none; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .task.done { background: #F7F8FC; }
+@media (hover: hover) { html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .task:hover { box-shadow: 0 8px 18px -12px rgba(22, 28, 64, .28); border-color: color-mix(in srgb, var(--accent) 28%, transparent); } }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .day-col { background: #FFFFFF; -webkit-backdrop-filter: none; backdrop-filter: none; border: 1px solid var(--border); box-shadow: none; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .day-col.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
+
+/* Boutons : capsules, principal pervenche plein (sans reflet) */
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .btn { background: #FFFFFF; border: 1px solid var(--border-strong); box-shadow: none; border-radius: 999px; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .btn:hover:not(:disabled) { background: #F6F7FD; border-color: color-mix(in srgb, var(--accent) 25%, var(--border-strong)); }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] :is(.btn.primary, .btn.dark) { background: var(--accent); color: #FFFFFF; border-color: transparent; box-shadow: 0 6px 16px -8px rgba(79, 107, 237, .6); }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] :is(.btn.primary, .btn.dark)::after { content: none; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] :is(.btn.primary, .btn.dark):hover:not(:disabled) { background: #4360E4; border-color: transparent; box-shadow: 0 8px 18px -8px rgba(79, 107, 237, .7); }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .chip { background: #FFFFFF; border-color: var(--border); }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .chip.on { background: var(--accent-soft); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); box-shadow: none; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] :is(.seg, .theme-switch) { background: #ECEEF7; border-color: transparent; border-radius: 999px; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] :is(.seg, .theme-switch) button { border-radius: 999px; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] :is(.seg button.on, .theme-switch button.on) { background: #FFFFFF; color: var(--text); box-shadow: 0 1px 2px rgba(22, 28, 64, .08), 0 2px 8px -4px rgba(22, 28, 64, .18); }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .badge { border-radius: 999px; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .badge.r { background: #FFF1F1; color: #D93F45; box-shadow: inset 0 0 0 1px #F6C5C7; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="range"]) { border-radius: 12px; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
+
+/* Fenêtres : blanc plein, profondeur douce */
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .sheet { background: #FFFFFF; -webkit-backdrop-filter: none; backdrop-filter: none; border: 1px solid var(--border); border-radius: 22px; box-shadow: 0 2px 6px rgba(22, 28, 64, .05), 0 30px 80px -30px rgba(22, 28, 64, .38) !important; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .sheet > :is(.sheet-h, .sheet-f) { background: #FFFFFF; }
+html[data-ui="v2"][data-theme="clair"][data-variant="iris"] .overlay { background: rgba(21, 23, 46, .20); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+
+/* Touches de couleur */
+html[data-variant="iris"] .flow-quote #fq { background-image: linear-gradient(90deg, #4F6BED, #8B5CF6) !important; }
+html[data-variant="iris"] .flow-quote .caret { background: #4F6BED !important; }
+html[data-variant="iris"] .mring { --mr-glow: rgba(79, 107, 237, .5); }
+html[data-variant="iris"] .mring .mr-a { stop-color: #4F6BED !important; }
+html[data-variant="iris"] .mring .mr-b { stop-color: #22C6F0 !important; }
+.tp-iris { background: #EEF0F8; } .tp-iris i { background: #FFFFFF; border: 1px solid rgba(31, 41, 92, .07); } .tp-iris .tp-side { background: #FFFFFF; } .tp-iris .tp-bar { background: linear-gradient(90deg, #4F6BED, #D4EF5A); }
+.tp-grid:has(> :nth-child(4)) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 760px) { .tp-grid:has(> :nth-child(4)) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Curseur « Noir Signature » aux couleurs d'Iris */
+@media (hover: hover) and (pointer: fine) {
+  html[data-theme="clair"][data-variant="iris"][data-cur="noir"], html[data-theme="clair"][data-variant="iris"][data-cur="noir"] *:not(input[type="text"]):not(input[type="search"]):not(input[type="email"]):not(input[type="password"]):not(input[type="date"]):not(input[type="number"]):not(textarea) { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 28 28'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234F6BED'/%3E%3Cstop offset='1' stop-color='%238EA2FF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M4 3 L4 22 L9.2 17.2 L12.6 25 L16 23.5 L12.7 15.9 L20 15.6 Z' fill='%2315172E' stroke='url(%23g)' stroke-width='2.2' stroke-linejoin='round'/%3E%3C/svg%3E") 3 2, auto !important; }
+}
+
+/* Survol des cartes cliquables : ombre un peu plus présente (le mouvement lui-même vient du système commun) */
+@media (hover: hover) {
+  html[data-ui="v2"][data-theme="clair"][data-variant="iris"] :is(.kpi.kpi-click, a.kpi, .card.collab-card):hover { box-shadow: var(--ir-shadow-hover); }
+}
+
+/* Courbes : le citron, trop pâle sur fond blanc, est foncé pour rester lisible */
+html[data-variant="iris"] .kpi .spark.sp-a path { stroke: #9DBA16; }

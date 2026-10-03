@@ -50,8 +50,8 @@
       clampToStart(); // V26.168
       render();
     },
-    teamcell: el => { S.collabId = el.dataset.c; S.cursor = el.dataset.date; S.month = S.cursor.slice(0, 7); S.planMode = 'day'; S.keepMode = true; go('planning'); },
-    'collab-plan': el => { S.collabId = el.dataset.id; S.planMode = 'month'; S.keepMode = true; S.cursor = S.month + '-01'; go('planning'); },
+    teamcell: el => { S.collabId = el.dataset.c; S.planAll = false; S.cursor = el.dataset.date; S.month = S.cursor.slice(0, 7); S.planMode = 'day'; S.keepMode = true; go('planning'); },
+    'collab-plan': el => { S.collabId = el.dataset.id; S.planAll = false; S.planMode = 'month'; S.keepMode = true; S.cursor = S.month + '-01'; go('planning'); },
     task: el => openSheet({ type: 'task', id: el.dataset.id }),
     done: async (el, e) => { e.stopPropagation(); const t = S.data.tasks.get(el.dataset.id); if (!t) return; const inSheet = !!el.closest('.sheet'), was = t.done; const r = await finishTask(t); if (inSheet && !was && r === 'ok' && S.sheet && S.sheet.type === 'task') closeSheet(); },
     group: el => { const p = el.dataset.key.split(':'); openSheet({ type: 'group', pid: p[1], date: p[2], cid: p[3] }); },
@@ -61,14 +61,15 @@
     lock: el => { const t = S.data.tasks.get(el.dataset.id); if (t) toggleLock(t); },
     alert: el => {
       if (el.dataset.task) openSheet({ type: 'task', id: el.dataset.task });
-      else if (el.dataset.collab && el.dataset.date) { S.collabId = el.dataset.collab; S.cursor = el.dataset.date; S.planMode = 'day'; S.keepMode = true; go('planning'); }
+      else if (el.dataset.collab && el.dataset.date) { S.collabId = el.dataset.collab; S.planAll = false; S.cursor = el.dataset.date; S.planMode = 'day'; S.keepMode = true; go('planning'); }
       else if (el.dataset.collab) go('dashboard');
       else if (el.dataset.client) openSheet({ type: 'client', id: el.dataset.client });
     },
     close: () => closeSheet(),
     overlay: (el, e) => { if (e.target === el) closeSheet(); },
     generate: el => generateMonth(el.dataset.m),
-    replan: el => openReplan(el.dataset.m),
+    replan: el => openReplan(el.dataset.m, el.dataset.opt === '1'), // V26.186 : « Optimiser le planning » depuis le Planning
+    'pc-reset': () => { S.pf = { kind: '', client: '', status: '', q: '' }; render(); },
     'rb-open': el => { const props = rebalanceProps(el.dataset.m); openSheet({ type: 'rebal', m: el.dataset.m, props, sel: new Set(props.map(x => x.task_id)), wide: true }); },
     'rb-all': el => { const s = S.sheet; if (!s || s.type !== 'rebal') return; s.sel = el.dataset.v === '1' ? new Set(s.props.map(x => x.task_id)) : new Set(); renderSheet(); },
     'rb-apply': () => applyRebalance(),
@@ -149,6 +150,9 @@
     recdate: el => { S.recDate = el.value; },
     recall: el => { S.recAll = el.checked; render(); },
     ccollab: el => { S.clientCollab = el.value; render(); },
+    // V26.186 : filtres du Planning (équipe / une personne, type, dossier, statut)
+    'pc-who': el => { if (el.value) { S.planAll = false; S.collabId = el.value; lsSet('planif-collab', el.value); } else S.planAll = true; render(); },
+    'pc-f': el => { S.pf = Object.assign({}, S.pf, { [el.dataset.k]: el.value }); render(); },
     cfilter: el => { S.cf = Object.assign({}, S.cf, { [el.dataset.k]: el.value }); render(); },
     filter: el => { S.filters[el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value; render(); },
     't-date': el => { const t = S.data.tasks.get(el.dataset.id); if (t && el.value !== (t.planned_date || '')) moveTask(t, el.value || null); },
@@ -249,7 +253,8 @@
     // V26.176 : filtres en saisie — les lignes retirées disparaissent, les nouvelles arrivent en fondu, les autres glissent à leur place
     recq: el => { S.recQ = el.value; S.recPage_h = 1; const r = $('#rec-home'); if (r && S._recHome) fxSwap(r, recHomeList(S._recHome.recs, S._recHome.d)); }, // V26.157
     csearch: el => { S.clientSearch = el.value; const r = $('#results'); if (r) fxSwap(r, clientsTable()); },
-    search: el => { S.search = el.value; const r = $('#results'); if (r) fxSwap(r, searchResults()); }
+    search: el => { S.search = el.value; const r = $('#results'); if (r) fxSwap(r, searchResults()); },
+    'pc-q': el => { S.pf = Object.assign({}, S.pf, { q: el.value }); pcRefresh(); } // V26.186 : recherche du Planning
   };
   Object.assign(ACT, {
     motion: el => { const m = el.dataset.m; lsSet('planif-motion', m); if (m === 'system') delete document.documentElement.dataset.motion; else document.documentElement.dataset.motion = m; toast(m === 'always' ? 'Animations toujours actives sur cet appareil.' : m === 'reduced' ? 'Animations réduites sur cet appareil.' : 'Animations selon le réglage de l\'appareil.', 'ok', null, 2500); render(); },
@@ -465,7 +470,7 @@
   function go(route) { if (location.hash !== '#/' + route) location.hash = '#/' + route; else render(); }
   function onRoute() {
     const prevRoute = S.route; S.route = (location.hash.replace(/^#\/?/, '') || 'today').split('?')[0];
-    if (S.route === 'planning' && prevRoute !== 'planning' && !S.keepMode) S.planMode = 'week'; S.keepMode = false;
+    if (S.route === 'planning' && prevRoute !== 'planning' && !S.keepMode) { S.planMode = 'day'; S.planAll = undefined; } S.keepMode = false; // V26.186 : le Planning s'ouvre sur la journée de toute l'équipe
     if ((!NAV_FLAT.some(n => n[0] === S.route) && S.route !== 'more') || !navAllowed(S.route)) S.route = 'today';
     if (S.sheet) closeSheet(true);
     S.drawer = false; S.enter = true;

@@ -79,31 +79,10 @@
   }
 
   /* ---------- Vue PLANNING ---------- */
+  /* V26.186 : l'onglet Planning devient le « cockpit » de l'équipe (071-planning-cockpit.js) — indicateurs, frise du jour, semaine, cartes de pilotage */
   function vPlanning() {
     if (!collabs().length) return noCollabsHelp();
-    const m = S.cursor.slice(0, 7);
-    const modes = [['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois']];
-    const lbl = S.planMode === 'day' ? fDate(S.cursor) : S.planMode === 'week' ? 'Semaine du ' + fDM(E.startOfWeek(S.cursor)) : fMonth(m);
-    const c = collabOf(S.collabId);
-    let body = '';
-    if (!c) body = '<div class="notice">Sélectionnez un collaborateur.</div>';
-    else if (S.planMode === 'day') body = planDay(c);
-    else if (S.planMode === 'week') body = planWeek(c);
-    else body = planMonth(c, m);
-    return '<div class="print-title">Planning de ' + esc(c ? c.name : '') + ' — ' + esc(lbl) + '</div>'
-      + '<div class="row no-print" style="margin-bottom:10px">' + collabChips() + '</div>' + (c ? quickBar(c.id, m) : '') + ''
-      + '<div class="row no-print" style="margin-bottom:14px"><div class="seg">' + modes.map(x => '<button class="' + (S.planMode === x[0] ? 'on' : '') + '" data-act="pmode" data-m="' + x[0] + '">' + x[1] + '</button>').join('') + '</div>'
-      + '<div class="row"><button class="btn sm" data-act="nav" data-d="-1" aria-label="Précédent"' + (prevBlocked(S.planMode === 'month' ? 'pmonth' : S.planMode) ? ' disabled' : '') + '>‹</button><button class="btn sm" data-act="nav" data-d="0">Aujourd\'hui</button><button class="btn sm" data-act="nav" data-d="1" aria-label="Suivant">›</button></div>'
-      + '<b class="cap">' + esc(lbl) + '</b><span class="spacer"></span>' + monthActions(m) + '<button class="btn hide-m" data-act="print">' + ic('download', 'sm') + 'PDF</button></div>' + body;
-  }
-  function planDay(c) {
-    const d = S.cursor, ts = withTimes(dayTasks(c.id, d), d);
-    const al = alertsOf(engineData(), today(), { collabId: c.id, month: d.slice(0, 7) }).filter(a => a.date === d || ts.some(x => x.t.id === a.task_id));
-    return '<div class="grid g2"><div class="card"><div class="card-h"><h2 class="cap">' + fDate(d) + '</h2></div>'
-      + (ts.length ? '<div class="tasks">' + unitsOf(ts).map(u => unitRow(u, {})).join('') + '</div>' : '<div class="empty">Aucune tâche.</div>') + '</div>'
-      + '<div><div class="card"><h2 style="margin-bottom:10px">Niveau d\'activité</h2>' + loadBlock(c.id, d)
-      + '<p class="small muted">Dossiers : ' + [...new Set(ts.map(x => (clientOf(x.t.client_id) || {}).name))].map(esc).join(', ') + '</p></div>'
-      + '<div class="card"><h2 style="margin-bottom:10px">Alertes</h2>' + alertList(al) + '</div></div></div>';
+    return pcView();
   }
   function weekDays(c, start) {
     return E.rangeDates(start, E.addDays(start, 4)); // lundi → vendredi (le week-end n'existe pas dans l'outil)
@@ -121,15 +100,14 @@
     const x = ctx(), start = E.startOfWeek(S.cursor), days = weekDays(c, start), td = today();
     const win = E.windowOf(S.cursor.slice(0, 7), x.settings);
     const cols = days.map(d => {
-      const cap = E.capacityOn(c, d, x), l = E.loadOf(list('tasks'), c.id, d), lv = E.levelOf(l.total, cap, x.settings);
-      const pct = cap ? Math.round(l.total / cap * 100) : 0;
+      const cap = E.capacityOn(c, d, x), l = E.loadOf(list('tasks'), c.id, d), pf = pcFill(l.total, cap); // V26.186 : barre graphique, sans pourcentage
       const hol = x.settings.holidays && E.holidayName(d), ab = E.absenceOn(c.id, d, x);
       const outwin = d < win.start || d > win.end;
       const units = unitsOf(dayTasks(c.id, d).map(t => ({ t, date: d })));
       const dens = units.length > 7 ? ' dense xdense' : units.length > 4 ? ' dense' : '';
-      return '<div class="day-col' + dens + (d === td ? ' today' : '') + (outwin ? ' outwin' : '') + (c.kind === 'apprenti' && !cap ? ' ap-off' : '') + '" data-drop="' + d + '"' + (withDc ? ' data-dc="' + c.id + '"' : '') + '><div class="dh" data-act="goday" data-date="' + d + '"><b>' + fShort(d) + ' ' + fMonth(d.slice(0, 7)).split(' ')[0] + '</b><span class="small muted">' + E.fmtMin(l.total) + ' / ' + E.fmtMin(cap) + '</span></div>'
-        + '<div class="bar"><i class="lv-' + lv + '" style="width:' + Math.min(100, cap ? pct : (l.total ? 100 : 0)) + '%"></i></div><div class="small ' + (lv === 'red' ? '' : 'muted') + '" style="' + (lv === 'red' ? 'color:var(--red);font-weight:600' : '') + '">' + (cap ? 'Remplissage ' + pct + ' %' : (hol ? 'Férié' : ab ? absLabel(ab) : c.kind === 'apprenti' ? 'École / hors entreprise' : 'Non travaillé')) + '</div>'
-        + units.map(u => unitRow(u, { mini: true, drag: true })).join('') + '</div>';
+      return '<div class="day-col pc-dcol' + dens + (d === td ? ' today' : '') + (outwin ? ' outwin' : '') + (c.kind === 'apprenti' && !cap ? ' ap-off' : '') + '" data-drop="' + d + '"' + (withDc ? ' data-dc="' + c.id + '"' : '') + '><div class="dh" data-act="goday" data-date="' + d + '"><b>' + (d === td ? '<i class="pc-dot g"></i>' : '') + fShort(d) + ' ' + fMonth(d.slice(0, 7)).split(' ')[0] + '</b><span class="small muted"><b>' + E.fmtMin(l.total) + '</b> / ' + E.fmtMin(cap) + '</span></div>'
+        + (cap || l.total ? pcBar(pf) + '<div class="pc-who-f f-' + pf.cls + '">' + esc(pf.txt) + '</div>' : '<div class="small muted">' + (hol ? 'Férié' : ab ? absLabel(ab) : c.kind === 'apprenti' ? 'École / hors entreprise' : 'Non travaillé') + '</div>')
+        + units.filter(u => pcMatch(u.tasks[0], pcState(u.tasks[0], d, null))).map(u => pcCard(u.tasks[0], d)).join('') + '</div>';
     }).join('');
     return '<div class="week" style="--cols:' + days.length + '">' + cols + '</div>' + (noHint ? '' : '<p class="small muted hide-m">Astuce : glissez-déposez une tâche d\'un jour à l\'autre, ou cliquez dessus pour la modifier. Les jours grisés sont hors de la période ' + x.settings.start_day + ' → ' + endLbl(S.cursor.slice(0, 7)) + '.</p>');
   }

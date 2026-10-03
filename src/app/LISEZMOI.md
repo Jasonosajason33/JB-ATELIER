@@ -13,6 +13,7 @@ Ils forment un seul module (ils partagent les mêmes variables) : le premier ouv
 | 05-equipes-chiffrement-dashboards.js | équipes et rôles, chiffrement, Dashboard Clients, choix de l'ambiance |
 | 06-espace-collaborateur.js | page Aujourd'hui du collaborateur, aide proposée |
 | 07-vues-production.js | vues Aujourd'hui, Planning, Équipe, Réceptions, Dossiers, Recherche |
+| 071-planning-cockpit.js | V26.186 : onglet Planning « cockpit » — 4 indicateurs, frise horaire de l'équipe (Jour), semaine de l'équipe, filtres, tâches à affecter, cartes de pilotage, « Optimiser le planning » — styles dans `app/design-planning.css` |
 | 08-pilotage-synthese.js | Pilotage, surcharges prévues, dossiers à risque, synthèse hebdomadaire, vue Historique |
 | 09-indicateurs-historique-parametres.js | Indicateurs (KPI), liste de l'historique, suivi des migrations, Export, Paramètres |
 | 10-feuilles.js | fenêtres de détail et formulaires |
