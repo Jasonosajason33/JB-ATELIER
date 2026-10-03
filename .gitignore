@@ -1,0 +1,5 @@
+# Copies de travail et livrables locaux (ne pas publier)
+demo-app/
+rapport/
+*.zip
+.claude/
