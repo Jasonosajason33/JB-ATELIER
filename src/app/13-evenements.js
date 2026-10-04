@@ -5,6 +5,7 @@
     retry: () => retryFailed(),
     logout: async () => { if (S.failed.length && !await confirmBox('Modifications non enregistrées', '<p>' + S.failed.length + ' modification(s) ne sont pas enregistrées et seront perdues.</p>', 'Se déconnecter quand même', true)) return; lsDel(CACHE_KEY); await S.store.signOut(); location.hash = ''; location.reload(); },
     collab: el => { S.collabId = el.dataset.id || null; S.todayTeam = false; lsSet('planif-collab', S.collabId || ''); render(); },
+    'today-plan': el => { if (el.dataset.c) { S.collabId = el.dataset.c; S.planAll = false; } else S.planAll = true; S.cursor = today(); S.month = S.cursor.slice(0, 7); S.planMode = 'day'; S.keepMode = true; go('planning'); }, // V26.194
     'today-team': () => { S.todayTeam = true; render(); }, // V26.190 : Aujourd'hui — toute l'équipe dans les cartes
     month: el => { S.month = E.addMonths(S.month, Number(el.dataset.d)); clampToStart(); S.recSel.clear(); shownCounts.clear(); ensureMonth(S.month); render(); }, // changement de mois : les chiffres repartent de 0 (V26.168 : jamais avant le début d'utilisation)
     pmode: el => { // V26.163 : de la vue Semaine à la vue Jour → premier jour (ouvré) de la semaine affichée
