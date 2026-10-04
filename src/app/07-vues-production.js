@@ -113,9 +113,9 @@
     }).join('');
     return '<div class="week" style="--cols:' + days.length + '">' + cols + '</div>' + (noHint ? '' : '<p class="small muted hide-m">Astuce : glissez-déposez une tâche d\'un jour à l\'autre, ou cliquez dessus pour la modifier. Les jours grisés sont hors de la période ' + x.settings.start_day + ' → ' + endLbl(S.cursor.slice(0, 7)) + '.</p>');
   }
-  function planMonth(c, m) {
+  function planMonth(c, m, from) { // V26.193 : from = premier jour affiché (mois en cours : à partir d'aujourd'hui) — les totaux restent ceux de la période
     const x = ctx(), win = E.windowOf(m, x.settings), td = today(), dates = E.monthDates(m);
-    const wdays = dates.filter(d => E.dow(d) <= 5), lead = E.dow(wdays[0]) - 1;
+    const wdays = dates.filter(d => E.dow(d) <= 5), shown = wdays.filter(d => !from || d >= from), lead = E.dow((shown[0] || wdays[0])) - 1;
     let cells = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'].map(w => '<div class="wd">' + w + '</div>').join('');
     for (let i = 0; i < lead; i++) cells += '<div class="mcell blank"></div>';
     let tot = 0, capT = 0;
@@ -123,6 +123,7 @@
       const cap = E.capacityOn(c, d, x), l = E.loadOf(list('tasks'), c.id, d), lv = E.levelOf(l.total, cap, x.settings);
       const n = dayTasks(c.id, d).length, outwin = d < win.start || d > win.end;
       if (!outwin) { tot += l.total; capT += cap; }
+      if (from && d < from) continue;
       const hol = x.settings.holidays && E.holidayName(d);
       cells += '<div class="mcell cell-' + (cap || l.total ? lv : 'off') + (outwin ? ' outwin' : '') + (d === td ? ' today' : '') + '" data-act="goday" data-date="' + d + '" data-drop="' + d + '" data-dc="' + c.id + '"><div class="dn"><span>' + Number(d.slice(8)) + '</span>' + (hol ? '<span title="' + esc(hol) + '">F</span>' : '') + '</div>'
         + (l.total ? '<div class="hl">' + E.fmtMin(l.total) + '<span class="hide-m"> / ' + E.fmtMin(cap) + '</span></div><div class="cnt small">' + n + ' tâche' + (n > 1 ? 's' : '') + '</div>' : cap ? '<div class="small muted">libre<span class="hide-m"> · ' + E.fmtMin(cap) + '</span></div>' : '') + '</div>';

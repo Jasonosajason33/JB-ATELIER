@@ -153,6 +153,7 @@
     ccollab: el => { S.clientCollab = el.value; render(); },
     // V26.186 : filtres du Planning (équipe / une personne, type, dossier, statut)
     'pc-who': el => { if (el.value) { S.planAll = false; S.collabId = el.value; lsSet('planif-collab', el.value); } else S.planAll = true; render(); },
+    'pc-mall': el => { S.pcMonthAll = !!el.value; render(); }, // V26.193 : mois en cours, afficher aussi les premiers jours
     'pc-f': el => { S.pf = Object.assign({}, S.pf, { [el.dataset.k]: el.value }); render(); },
     cfilter: el => { S.cf = Object.assign({}, S.cf, { [el.dataset.k]: el.value }); render(); },
     filter: el => { S.filters[el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value; render(); },

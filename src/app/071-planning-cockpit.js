@@ -265,8 +265,12 @@
       const start = E.startOfWeek(S.cursor), days = E.rangeDates(start, E.addDays(start, 4));
       return (S.planAll || pcSolo() ? pcWeek(sets, m) : planWeek(pcScope()[0])) + pcCards(days, sets, m);
     }
-    if (S.planAll || pcSolo()) { const g = teamGantt(E.monthDates(m).filter(d => E.dow(d) <= 5)); return isManager() ? g : g.replace('Jour surchargé', 'Jour au-delà de la capacité'); } // vocabulaire V26.173
-    return planMonth(pcScope()[0], m);
+    // V26.193 : mois en cours — seuls les jours à partir d'aujourd'hui sont affichés ; un petit menu montre les premiers jours si besoin
+    const td = today(), cur = m === td.slice(0, 7), wd = E.monthDates(m).filter(d => E.dow(d) <= 5), past = cur ? wd.filter(d => d < td) : [];
+    const from = past.length && !S.pcMonthAll ? td : null;
+    const bar = past.length ? '<div class="pc-mfrom no-print"><select class="pc-sel' + (S.pcMonthAll ? ' v2-active' : '') + '" data-ch="pc-mall" aria-label="Jours affichés"><option value="">Du ' + Number(td.slice(8)) + ' à la fin du mois</option><option value="1"' + (S.pcMonthAll ? ' selected' : '') + '>Tout le mois (avec les ' + (Number(td.slice(8)) - 1) + ' premiers jours)</option></select></div>' : '';
+    if (S.planAll || pcSolo()) { const g = teamGantt(wd.filter(d => !from || d >= from)); return bar + (isManager() ? g : g.replace('Jour surchargé', 'Jour au-delà de la capacité')); } // vocabulaire V26.173
+    return bar + planMonth(pcScope()[0], m, from);
   }
   function pcView() {
     pcInit();

@@ -384,3 +384,7 @@ html:is([data-theme="signature"], [data-variant="aurora"], [data-theme="nuit"]) 
 /* Indicateurs : libellés et zéros en noir (couleur du texte du thème) */
 .pc-kpi-l { color: var(--text); }
 .pc-kpi-v b.z { color: var(--text); }
+
+/* V26.193 : mois en cours — choix des jours affichés */
+.pc-mfrom { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.pc-mfrom .pc-sel { max-width: 320px; }

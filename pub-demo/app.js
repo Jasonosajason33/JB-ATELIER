@@ -2762,9 +2762,9 @@
     }).join('');
     return '<div class="week" style="--cols:' + days.length + '">' + cols + '</div>' + (noHint ? '' : '<p class="small muted hide-m">Astuce : glissez-déposez une tâche d\'un jour à l\'autre, ou cliquez dessus pour la modifier. Les jours grisés sont hors de la période ' + x.settings.start_day + ' → ' + endLbl(S.cursor.slice(0, 7)) + '.</p>');
   }
-  function planMonth(c, m) {
+  function planMonth(c, m, from) { // V26.193 : from = premier jour affiché (mois en cours : à partir d'aujourd'hui) — les totaux restent ceux de la période
     const x = ctx(), win = E.windowOf(m, x.settings), td = today(), dates = E.monthDates(m);
-    const wdays = dates.filter(d => E.dow(d) <= 5), lead = E.dow(wdays[0]) - 1;
+    const wdays = dates.filter(d => E.dow(d) <= 5), shown = wdays.filter(d => !from || d >= from), lead = E.dow((shown[0] || wdays[0])) - 1;
     let cells = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'].map(w => '<div class="wd">' + w + '</div>').join('');
     for (let i = 0; i < lead; i++) cells += '<div class="mcell blank"></div>';
     let tot = 0, capT = 0;
@@ -2772,6 +2772,7 @@
       const cap = E.capacityOn(c, d, x), l = E.loadOf(list('tasks'), c.id, d), lv = E.levelOf(l.total, cap, x.settings);
       const n = dayTasks(c.id, d).length, outwin = d < win.start || d > win.end;
       if (!outwin) { tot += l.total; capT += cap; }
+      if (from && d < from) continue;
       const hol = x.settings.holidays && E.holidayName(d);
       cells += '<div class="mcell cell-' + (cap || l.total ? lv : 'off') + (outwin ? ' outwin' : '') + (d === td ? ' today' : '') + '" data-act="goday" data-date="' + d + '" data-drop="' + d + '" data-dc="' + c.id + '"><div class="dn"><span>' + Number(d.slice(8)) + '</span>' + (hol ? '<span title="' + esc(hol) + '">F</span>' : '') + '</div>'
         + (l.total ? '<div class="hl">' + E.fmtMin(l.total) + '<span class="hide-m"> / ' + E.fmtMin(cap) + '</span></div><div class="cnt small">' + n + ' tâche' + (n > 1 ? 's' : '') + '</div>' : cap ? '<div class="small muted">libre<span class="hide-m"> · ' + E.fmtMin(cap) + '</span></div>' : '') + '</div>';
@@ -3232,8 +3233,12 @@
       const start = E.startOfWeek(S.cursor), days = E.rangeDates(start, E.addDays(start, 4));
       return (S.planAll || pcSolo() ? pcWeek(sets, m) : planWeek(pcScope()[0])) + pcCards(days, sets, m);
     }
-    if (S.planAll || pcSolo()) { const g = teamGantt(E.monthDates(m).filter(d => E.dow(d) <= 5)); return isManager() ? g : g.replace('Jour surchargé', 'Jour au-delà de la capacité'); } // vocabulaire V26.173
-    return planMonth(pcScope()[0], m);
+    // V26.193 : mois en cours — seuls les jours à partir d'aujourd'hui sont affichés ; un petit menu montre les premiers jours si besoin
+    const td = today(), cur = m === td.slice(0, 7), wd = E.monthDates(m).filter(d => E.dow(d) <= 5), past = cur ? wd.filter(d => d < td) : [];
+    const from = past.length && !S.pcMonthAll ? td : null;
+    const bar = past.length ? '<div class="pc-mfrom no-print"><select class="pc-sel' + (S.pcMonthAll ? ' v2-active' : '') + '" data-ch="pc-mall" aria-label="Jours affichés"><option value="">Du ' + Number(td.slice(8)) + ' à la fin du mois</option><option value="1"' + (S.pcMonthAll ? ' selected' : '') + '>Tout le mois (avec les ' + (Number(td.slice(8)) - 1) + ' premiers jours)</option></select></div>' : '';
+    if (S.planAll || pcSolo()) { const g = teamGantt(wd.filter(d => !from || d >= from)); return bar + (isManager() ? g : g.replace('Jour surchargé', 'Jour au-delà de la capacité')); } // vocabulaire V26.173
+    return bar + planMonth(pcScope()[0], m, from);
   }
   function pcView() {
     pcInit();
@@ -5519,6 +5524,7 @@
     ccollab: el => { S.clientCollab = el.value; render(); },
     // V26.186 : filtres du Planning (équipe / une personne, type, dossier, statut)
     'pc-who': el => { if (el.value) { S.planAll = false; S.collabId = el.value; lsSet('planif-collab', el.value); } else S.planAll = true; render(); },
+    'pc-mall': el => { S.pcMonthAll = !!el.value; render(); }, // V26.193 : mois en cours, afficher aussi les premiers jours
     'pc-f': el => { S.pf = Object.assign({}, S.pf, { [el.dataset.k]: el.value }); render(); },
     cfilter: el => { S.cf = Object.assign({}, S.cf, { [el.dataset.k]: el.value }); render(); },
     filter: el => { S.filters[el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value; render(); },
