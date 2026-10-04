@@ -3054,7 +3054,7 @@
 
   /* ---------- En-tête : 4 indicateurs, puis la date ---------- */
   function pcKpis(sets) {
-    const k = (id, label, n, tone, sub) => '<button class="pc-kpi' + (S.quick === id ? ' on' : '') + '" data-act="quick" data-q="' + id + '" title="' + esc(QUICK_TIP[id] || label) + '"><span class="pc-kpi-l">' + label + '</span><span class="pc-kpi-v"><i class="pc-dot ' + (n ? tone : 'z') + '"></i><b data-count="' + n + '" data-key="pck-' + id + '">' + n + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span></button>';
+    const k = (id, label, n, tone, sub) => '<button class="pc-kpi' + (S.quick === id ? ' on' : '') + '" data-act="quick" data-q="' + id + '" title="' + esc(QUICK_TIP[id] || label) + '"><span class="pc-kpi-l">' + label + '</span><span class="pc-kpi-v"><i class="pc-dot ' + (n ? tone : 'z') + '"></i><b class="' + (n ? tone : 'z') + '" data-count="' + n + '" data-key="pck-' + id + '">' + n + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span></button>';
     return '<div class="pc-kpis no-print">' + k('today', 'À traiter aujourd\'hui', sets.today.length, 'r') + k('late', 'En retard', sets.late.length, 'r') + k('recv', 'À recevoir', sets.recv.length, 'o') + k('done', 'Terminé', sets.done.length, 'g', 'ce mois') + '</div>';
   }
   function pcDateLabel() {
@@ -3211,10 +3211,10 @@
     const ids = new Set(cs.map(c => c.id)), inRange = all.filter(t => ids.has(t.collaborator_id) && dates.some(d => E.onDay(t, d)));
     const hrs = per.reduce((s, p) => s + p.l, 0), caps = per.reduce((s, p) => s + p.cap, 0), doneN = inRange.filter(t => t.done).length;
     const syn = '<div class="card pc-c"><div class="pc-c-h"><h3>Synthèse</h3><span class="small muted">' + (isDay ? 'jour' : 'semaine') + '</span></div><div class="pc-syn">'
-      + '<div><b data-count="' + inRange.length + '" data-key="pcs-n">' + inRange.length + '</b><span>tâche' + (inRange.length > 1 ? 's' : '') + (isDay ? ' ce jour' : ' cette semaine') + '</span></div>'
-      + '<div><b>' + E.fmtMin(hrs) + '</b><span>planifiées' + (caps ? ' sur ' + E.fmtMin(caps) : '') + '</span></div>'
-      + '<div><b>' + cs.length + '</b><span>collaborateur' + (cs.length > 1 ? 's' : '') + '</span></div>'
-      + '<div><b>' + doneN + '</b><span>terminée' + (doneN > 1 ? 's' : '') + '</span></div></div>'
+      + '<div class="sy-a"><b data-count="' + inRange.length + '" data-key="pcs-n">' + inRange.length + '</b><span>tâche' + (inRange.length > 1 ? 's' : '') + (isDay ? ' ce jour' : ' cette semaine') + '</span></div>'
+      + '<div class="sy-v"><b>' + E.fmtMin(hrs) + '</b><span>planifiées' + (caps ? ' sur ' + E.fmtMin(caps) : '') + '</span></div>'
+      + '<div class="sy-t"><b>' + cs.length + '</b><span>collaborateur' + (cs.length > 1 ? 's' : '') + '</span></div>'
+      + '<div class="sy-g"><b>' + doneN + '</b><span>terminée' + (doneN > 1 ? 's' : '') + '</span></div></div>'
       + '<div class="pc-syn-f small muted"><button class="lnk" data-act="quick" data-q="done">' + sets.done.length + ' tenue' + (sets.done.length > 1 ? 's' : '') + ' terminée' + (sets.done.length > 1 ? 's' : '') + ' en ' + esc(fMonth(m).split(' ')[0]) + '</button> · <button class="lnk" data-act="quick" data-q="tvasent">' + sets.tvasent.length + ' TVA envoyée' + (sets.tvasent.length > 1 ? 's' : '') + '</button></div></div>';
     return '<div class="pc-cards">' + act + aff + sv + syn + '</div>';
   }

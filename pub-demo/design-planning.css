@@ -370,3 +370,10 @@ html:is([data-theme="signature"], [data-variant="aurora"], [data-theme="nuit"]) 
 #view .pc .pc-sel { height: 28px !important; min-height: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; line-height: 26px; }
 #view .pc .pc-search { height: 28px; min-height: 0; }
 #view .pc .pc-search input { height: 26px !important; min-height: 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+
+/* ---------- V26.188 : chiffres à la couleur de leur point, Synthèse en couleur ---------- */
+.pc-kpi-v b.r { color: var(--bad); } .pc-kpi-v b.o { color: var(--warn); } .pc-kpi-v b.g { color: var(--ok); } .pc-kpi-v b.z { color: var(--muted); }
+.pc-syn > div { --sy: var(--accent); padding: 9px 11px; border-radius: 12px; background: color-mix(in srgb, var(--sy) 9%, transparent); border: 1px solid color-mix(in srgb, var(--sy) 18%, transparent); }
+.pc-syn > div b { color: color-mix(in srgb, var(--sy) 85%, var(--text)); }
+.pc-syn > .sy-a { --sy: var(--pc-tenue); } .pc-syn > .sy-v { --sy: var(--pc-tva); } .pc-syn > .sy-t { --sy: #0EA2B4; } .pc-syn > .sy-g { --sy: var(--ok); }
+.pc-syn { gap: 8px; }
