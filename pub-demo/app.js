@@ -2533,7 +2533,7 @@
     const cliHtml = waiting.length ? recPager('c', waiting.length, 15) + recPage('c', waiting, 15).map(p => { const cl = clientOf(p.client_id) || {}; return '<div class="up-row cli"><div><b>' + esc(cl.name) + '</b><span>éléments attendus le ' + fDM(p.expected_date) + (p.month < defaultMonth() ? ' (' + fMonth(p.month) + ')' : '') + (p.partial_date ? ' · reçus en partie' : ', pas encore arrivés') + (lastRelance(p) ? ' · <b class="rel-done">' + ic(lastRelance(p).via === 'telephone' ? 'phone' : 'mail', 'sm') + esc(relLabel(lastRelance(p))) + '</b>' : '') + '</span></div><div class="acts"><button class="btn sm" data-act="relance" data-pid="' + p.id + '">' + ic('mail', 'sm') + 'Relancer</button><button class="btn sm rl-tel' + (lastRelance(p) && lastRelance(p).via === 'telephone' && lastRelance(p).date === today() ? ' on' : '') + '" data-act="relance-tel" data-pid="' + p.id + '" title="' + (lastRelance(p) && lastRelance(p).via === 'telephone' && lastRelance(p).date === today() ? 'Cliquer pour annuler la relance téléphonique d\'aujourd\'hui' : 'Noter que le client a été relancé par téléphone') + '"' + (S.readonly ? ' disabled' : '') + '>' + ic('phone', 'sm') + (lastRelance(p) && lastRelance(p).via === 'telephone' && lastRelance(p).date === today() ? 'Annuler la relance tél.' : 'Relancé par tél.') + '</button><button class="btn sm" data-act="rec-one" data-id="' + p.id + '">Reçu</button>' + (S.v7 ? '<button class="btn sm" data-act="rec-part" data-id="' + p.id + '">Partiel</button>' : '') + '</div></div>'; }).join('') + recPager('c', waiting.length, 15, true) : '<div class="empty">Tous les éléments attendus sont arrivés.</div>';
     const mineView = cid === S.me.collaborator_id;
     return '<div class="hello anim-in"><div><div class="eyebrow cap">' + fDate(d) + '</div><h1>Bonjour, ' + esc(first) + '</h1>' + flowQuoteHtml() + '<p>' + (mineView ? mood : 'Planning de ton binôme : ' + esc(c.name) + '.') + '</p></div>' + monthRing(cid) + '</div>'
-      + (binomeIds().size > 1 ? '<div style="margin-bottom:14px">' + collabChips() + '</div>' : '') + unplBanner(cid) + cfeReminder(cid) + cvaeReminder(cid) + capNoticeCollab(cid)
+      + (binomeIds().size > 1 ? '<div style="margin-bottom:14px">' + collabChips() + '</div>' : '') + unplBanner(cid) + cfeReminder(cid) + cvaeReminder(cid) + capNoticeCollab(cid) + irStrip([cid]) // V26.197
       + '<div class="card anim-in" style="--i:1;margin-bottom:var(--gap)"><div class="card-h"><h2>Aujourd\'hui</h2><span class="badge">' + E.fmtMin(rg.l.total) + ' prévues</span><a class="btn sm" href="#/planning" data-act="goday" data-date="' + d + '">Planning' + ic('chevR', 'sm') + '</a></div>'
       + (tasks.length ? '<div class="tasks">' + unitsOf(tasks).map((u, i) => unitRow(u, { i: i + 3 })).join('') + '</div><div class="swipe-hint only-m">Glisse une carte vers la droite pour la terminer, vers la gauche pour la verrouiller</div>' : '<div class="empty">Aucune production prévue aujourd\'hui.</div>') + '</div>'
       + '<div class="card anim-in" style="--i:2"><div class="card-h"><h2>' + (mineView ? 'Ma semaine' : 'Semaine de ' + esc(c.name)) + '</h2><span class="spacer"></span><button class="btn icon sm" data-act="home-week" data-d="-1" aria-label="Semaine précédente"' + (S.homeWeek > 0 ? '' : ' disabled') + '>' + ic('chevL', 'sm') + '</button><button class="btn icon sm" data-act="home-week" data-d="1" aria-label="Semaine suivante">' + ic('chevR', 'sm') + '</button></div><div class="wk">' + week + '</div>' + fb + (cid === S.me.collaborator_id ? timeReminder(cid) : '') + tip + '</div>'
@@ -2687,7 +2687,7 @@
     // V26.167 : RC / collaborateur — rappels CFE, CVAE et capacité, puis conseils (étalement, aide, temps réels) sous les indicateurs
     const tips = mgr ? '' : helpFeedback(cid) + (mine ? timeReminder(cid) : '') + collabTip(cid);
 
-    return head + (team ? '' : unplBanner(cid)) + (mgr ? '' : cfeReminder(cid) + cvaeReminder(cid) + capNoticeCollab(cid)) + progressBanner(cid, ids)
+    return head + (team ? '' : unplBanner(cid)) + (mgr ? '' : cfeReminder(cid) + cvaeReminder(cid) + capNoticeCollab(cid)) + progressBanner(cid, ids) + irStrip(team ? ids : [cid])
       + '<div class="carousel desk-grid kpis-today" data-keep="kpi-today">' + k1 + k2 + k3 + k4 + '</div><div class="dots" data-dots></div>'
       + (tips ? '<div class="today-tips">' + tips + '</div>' : '')
       + '<div class="split" style="margin-top:var(--gap)">'
@@ -2947,6 +2947,30 @@
     return '<div class="small muted" style="margin-bottom:8px">' + ts.length + ' tâche(s) · ' + E.fmtMin(tot) + '</div>' + (ts.length ? '<div class="tasks">' + ts.slice(0, 300).map(t => taskRow(t, { showDate: true, showCollab: true })).join('') + '</div>' + (ts.length > 300 ? '<p class="muted small">300 premières affichées — affinez la recherche.</p>' : '') : '<div class="empty">Aucun résultat.</div>');
   }
 
+  /* V26.197 : demandes d'informations — bandeau discret sur Aujourd'hui (toutes les vues), un clic ouvre la liste */
+  function irProds(ids) {
+    const m = today().slice(0, 7), set = new Set(ids.filter(Boolean));
+    return list('productions').filter(p => p.month === m && clientOf(p.client_id) && set.has(clientOf(p.client_id).collaborator_id));
+  }
+  // une demande est « à faire » si elle est notée ainsi ou si sa tâche « Demande d'infos » n'est pas terminée (même règle que le Planning)
+  function irState(p) { if (p.info_request === 'a_faire' || list('tasks').some(t => t.kind === 'info' && t.production_id === p.id && !t.done)) return 'a_faire'; return p.info_request || 'none'; }
+  function irStrip(ids) {
+    const ps = irProds(ids); if (!ps.length) return '';
+    const n = { faite: 0, a_faire: 0, non: 0, none: 0 }; ps.forEach(p => n[irState(p)]++);
+    return '<button class="ir-strip anim-in' + (n.a_faire ? ' todo' : '') + '" data-act="ir-list" data-ids="' + ids.filter(Boolean).join(',') + '" title="Voir la liste des demandes d\'informations">'
+      + '<span class="ir-i">' + ic('mail', 'sm') + '</span><b>Demandes d\'informations</b>'
+      + '<span class="ir-n ' + (n.a_faire ? 'o' : 'g') + '">' + (n.a_faire ? n.a_faire + ' à faire' : 'Rien à envoyer') + '</span>'
+      + '<span class="ir-m">' + n.faite + ' faite' + (n.faite > 1 ? 's' : '') + ' · ' + n.non + ' non nécessaire' + (n.non > 1 ? 's' : '') + ' · ' + n.none + ' non renseignée' + (n.none > 1 ? 's' : '') + '</span>' + ic('chevR', 'sm') + '</button>';
+  }
+  function sheetIrList(s) {
+    const ps = irProds(s.ids || []), by = k => ps.filter(p => irState(p) === k).sort((a, b) => ((clientOf(a.client_id) || {}).name || '').localeCompare((clientOf(b.client_id) || {}).name || '', 'fr'));
+    const row = (p, act) => { const c = clientOf(p.client_id), co = collabOf(c.collaborator_id); return '<div class="info-row"><span class="ibox ' + (act ? 'o' : 'g') + '">' + ic(act ? 'mail' : 'check', 'sm') + '</span><div class="t" data-act="client" data-id="' + c.id + '" style="cursor:pointer"><b>' + esc(c.name) + '</b><span>' + esc(co ? co.name : '—') + (p.info_request_at ? ' · ' + (act ? 'signalée' : 'faite') + ' le ' + fDM(p.info_request_at.slice(0, 10)) : '') + '</span></div>' + (act ? '<button class="btn sm" data-act="ir" data-pid="' + p.id + '" data-v="faite"' + (S.readonly ? ' disabled' : '') + '>' + ic('check', 'sm') + 'Faite</button>' : '') + '</div>'; };
+    const todo = by('a_faire'), done = by('faite');
+    return sheetHead('Demandes d\'informations — ' + fMonth(today().slice(0, 7)), todo.length + ' à faire · ' + done.length + ' faite' + (done.length > 1 ? 's' : '') + ' · ' + by('non').length + ' non nécessaire(s) · ' + by('none').length + ' non renseignée(s)')
+      + '<div class="sheet-b"><h3 style="margin:0 0 8px">À faire</h3>' + (todo.length ? '<div class="tasks">' + todo.map(p => row(p, true)).join('') + '</div>' : '<div class="empty">Aucune demande en attente.</div>')
+      + (done.length ? '<h3 style="margin:18px 0 8px">Faites</h3><div class="tasks">' + done.map(p => row(p, false)).join('') + '</div>' : '')
+      + '<p class="small muted" style="margin-top:14px">Une demande se renseigne depuis la fiche du dossier (clic sur son nom) ou la fiche d\'une tâche.</p></div><div class="sheet-f"><button class="btn" data-act="close">Fermer</button></div>';
+  }
   /* Suivi des demandes d'informations du mois (tableau de bord) */
   function irDashboard(m) {
     const prods = list('productions').filter(p => p.month === m && clientOf(p.client_id));
@@ -3761,10 +3785,10 @@
     const s = S.sheet;
     let inner = '';
     try {
-      inner = s.type === 'task' ? sheetTask(s) : s.type === 'prodDetail' ? sheetProdDetail(s) : s.type === 'filDetail' ? sheetFilDetail(s) : s.type === 'msDetail' ? sheetMsDetail(s) : s.type === 'rebal' ? sheetRebalance(s) : s.type === 'diag' ? sheetDiag(s) : s.type === 'tvaRecap' ? sheetTvaRecap(s) : s.type === 'isRecap' ? sheetIsRecap(s) : s.type === 'viewUser' ? sheetViewUser(s) : s.type === 'isCalc' ? sheetIsCalc(s) : s.type === 'cfeRecap' ? sheetCfeRecap(s) : s.type === 'relance' ? sheetRelance(s) : s.type === 'group' ? sheetGroup(s) :s.type === 'client' ? sheetClient(s) : s.type === 'collab' ? sheetCollab(s) : s.type === 'user' ? sheetUser(s) : s.type === 'replan' ? sheetReplan(s) : s.type === 'import' ? sheetImport(s) : s.type === 'hist-import' ? sheetHistImport(s) : s.type === 'team' ? sheetTeam(s) : '';
+      inner = s.type === 'task' ? sheetTask(s) : s.type === 'prodDetail' ? sheetProdDetail(s) : s.type === 'irList' ? sheetIrList(s) : s.type === 'filDetail' ? sheetFilDetail(s) : s.type === 'msDetail' ? sheetMsDetail(s) : s.type === 'rebal' ? sheetRebalance(s) : s.type === 'diag' ? sheetDiag(s) : s.type === 'tvaRecap' ? sheetTvaRecap(s) : s.type === 'isRecap' ? sheetIsRecap(s) : s.type === 'viewUser' ? sheetViewUser(s) : s.type === 'isCalc' ? sheetIsCalc(s) : s.type === 'cfeRecap' ? sheetCfeRecap(s) : s.type === 'relance' ? sheetRelance(s) : s.type === 'group' ? sheetGroup(s) :s.type === 'client' ? sheetClient(s) : s.type === 'collab' ? sheetCollab(s) : s.type === 'user' ? sheetUser(s) : s.type === 'replan' ? sheetReplan(s) : s.type === 'import' ? sheetImport(s) : s.type === 'hist-import' ? sheetHistImport(s) : s.type === 'team' ? sheetTeam(s) : '';
     } catch (e) { console.error(e); inner = '<div class="sheet-b"><div class="notice bad">' + esc(errMsg(e)) + '</div></div>'; }
     if (!inner) { S.sheet = null; root.innerHTML = ''; document.body.classList.remove('has-modal'); return; }
-    const center = s.type === 'relance' || s.type === 'replan' || s.type === 'import' || s.type === 'hist-import' || s.type === 'tvaRecap' || s.type === 'isRecap' || s.type === 'viewUser' || s.type === 'isCalc' || s.type === 'cfeRecap' || s.type === 'prodDetail' || s.type === 'filDetail' || s.type === 'msDetail' || s.type === 'rebal' || s.type === 'diag' || s.type === 'client' || s.type === 'task'; // V26.85 / V26.96 : fiche dossier centrée et agrandie
+    const center = s.type === 'relance' || s.type === 'replan' || s.type === 'import' || s.type === 'hist-import' || s.type === 'tvaRecap' || s.type === 'isRecap' || s.type === 'viewUser' || s.type === 'isCalc' || s.type === 'cfeRecap' || s.type === 'prodDetail' || s.type === 'irList' || s.type === 'filDetail' || s.type === 'msDetail' || s.type === 'rebal' || s.type === 'diag' || s.type === 'client' || s.type === 'task'; // V26.85 / V26.96 : fiche dossier centrée et agrandie
     document.body.classList.toggle('has-modal', center); // V26.96 : effet de profondeur (page en retrait derrière la fenêtre)
     const el = root.querySelector('.sheet');
     if (s._new || !el) {
@@ -5431,6 +5455,7 @@
     group: el => { const p = el.dataset.key.split(':'); openSheet({ type: 'group', pid: p[1], date: p[2], cid: p[3] }); },
     'done-group': (el, e) => { e.stopPropagation(); finishGroup(groupFromKey(el.dataset.key)); },
     'lock-group': el => lockGroup(groupFromKey(el.dataset.key)),
+    'ir-list': el => openSheet({ type: 'irList', ids: (el.dataset.ids || '').split(',').filter(Boolean) }), // V26.197
     ir: el => setInfoRequest(el.dataset.pid, el.dataset.v).then(r => { if (r === 'ok') toast(IR_LABEL[el.dataset.v] + ' — enregistré.', 'ok', null, 2500); }),
     lock: el => { const t = S.data.tasks.get(el.dataset.id); if (t) toggleLock(t); },
     alert: el => {

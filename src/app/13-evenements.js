@@ -59,6 +59,7 @@
     group: el => { const p = el.dataset.key.split(':'); openSheet({ type: 'group', pid: p[1], date: p[2], cid: p[3] }); },
     'done-group': (el, e) => { e.stopPropagation(); finishGroup(groupFromKey(el.dataset.key)); },
     'lock-group': el => lockGroup(groupFromKey(el.dataset.key)),
+    'ir-list': el => openSheet({ type: 'irList', ids: (el.dataset.ids || '').split(',').filter(Boolean) }), // V26.197
     ir: el => setInfoRequest(el.dataset.pid, el.dataset.v).then(r => { if (r === 'ok') toast(IR_LABEL[el.dataset.v] + ' — enregistré.', 'ok', null, 2500); }),
     lock: el => { const t = S.data.tasks.get(el.dataset.id); if (t) toggleLock(t); },
     alert: el => {

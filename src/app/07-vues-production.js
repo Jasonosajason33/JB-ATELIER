@@ -38,7 +38,7 @@
     // V26.167 : RC / collaborateur — rappels CFE, CVAE et capacité, puis conseils (étalement, aide, temps réels) sous les indicateurs
     const tips = mgr ? '' : helpFeedback(cid) + (mine ? timeReminder(cid) : '') + collabTip(cid);
 
-    return head + (team ? '' : unplBanner(cid)) + (mgr ? '' : cfeReminder(cid) + cvaeReminder(cid) + capNoticeCollab(cid)) + progressBanner(cid, ids)
+    return head + (team ? '' : unplBanner(cid)) + (mgr ? '' : cfeReminder(cid) + cvaeReminder(cid) + capNoticeCollab(cid)) + progressBanner(cid, ids) + irStrip(team ? ids : [cid])
       + '<div class="carousel desk-grid kpis-today" data-keep="kpi-today">' + k1 + k2 + k3 + k4 + '</div><div class="dots" data-dots></div>'
       + (tips ? '<div class="today-tips">' + tips + '</div>' : '')
       + '<div class="split" style="margin-top:var(--gap)">'
@@ -298,6 +298,30 @@
     return '<div class="small muted" style="margin-bottom:8px">' + ts.length + ' tâche(s) · ' + E.fmtMin(tot) + '</div>' + (ts.length ? '<div class="tasks">' + ts.slice(0, 300).map(t => taskRow(t, { showDate: true, showCollab: true })).join('') + '</div>' + (ts.length > 300 ? '<p class="muted small">300 premières affichées — affinez la recherche.</p>' : '') : '<div class="empty">Aucun résultat.</div>');
   }
 
+  /* V26.197 : demandes d'informations — bandeau discret sur Aujourd'hui (toutes les vues), un clic ouvre la liste */
+  function irProds(ids) {
+    const m = today().slice(0, 7), set = new Set(ids.filter(Boolean));
+    return list('productions').filter(p => p.month === m && clientOf(p.client_id) && set.has(clientOf(p.client_id).collaborator_id));
+  }
+  // une demande est « à faire » si elle est notée ainsi ou si sa tâche « Demande d'infos » n'est pas terminée (même règle que le Planning)
+  function irState(p) { if (p.info_request === 'a_faire' || list('tasks').some(t => t.kind === 'info' && t.production_id === p.id && !t.done)) return 'a_faire'; return p.info_request || 'none'; }
+  function irStrip(ids) {
+    const ps = irProds(ids); if (!ps.length) return '';
+    const n = { faite: 0, a_faire: 0, non: 0, none: 0 }; ps.forEach(p => n[irState(p)]++);
+    return '<button class="ir-strip anim-in' + (n.a_faire ? ' todo' : '') + '" data-act="ir-list" data-ids="' + ids.filter(Boolean).join(',') + '" title="Voir la liste des demandes d\'informations">'
+      + '<span class="ir-i">' + ic('mail', 'sm') + '</span><b>Demandes d\'informations</b>'
+      + '<span class="ir-n ' + (n.a_faire ? 'o' : 'g') + '">' + (n.a_faire ? n.a_faire + ' à faire' : 'Rien à envoyer') + '</span>'
+      + '<span class="ir-m">' + n.faite + ' faite' + (n.faite > 1 ? 's' : '') + ' · ' + n.non + ' non nécessaire' + (n.non > 1 ? 's' : '') + ' · ' + n.none + ' non renseignée' + (n.none > 1 ? 's' : '') + '</span>' + ic('chevR', 'sm') + '</button>';
+  }
+  function sheetIrList(s) {
+    const ps = irProds(s.ids || []), by = k => ps.filter(p => irState(p) === k).sort((a, b) => ((clientOf(a.client_id) || {}).name || '').localeCompare((clientOf(b.client_id) || {}).name || '', 'fr'));
+    const row = (p, act) => { const c = clientOf(p.client_id), co = collabOf(c.collaborator_id); return '<div class="info-row"><span class="ibox ' + (act ? 'o' : 'g') + '">' + ic(act ? 'mail' : 'check', 'sm') + '</span><div class="t" data-act="client" data-id="' + c.id + '" style="cursor:pointer"><b>' + esc(c.name) + '</b><span>' + esc(co ? co.name : '—') + (p.info_request_at ? ' · ' + (act ? 'signalée' : 'faite') + ' le ' + fDM(p.info_request_at.slice(0, 10)) : '') + '</span></div>' + (act ? '<button class="btn sm" data-act="ir" data-pid="' + p.id + '" data-v="faite"' + (S.readonly ? ' disabled' : '') + '>' + ic('check', 'sm') + 'Faite</button>' : '') + '</div>'; };
+    const todo = by('a_faire'), done = by('faite');
+    return sheetHead('Demandes d\'informations — ' + fMonth(today().slice(0, 7)), todo.length + ' à faire · ' + done.length + ' faite' + (done.length > 1 ? 's' : '') + ' · ' + by('non').length + ' non nécessaire(s) · ' + by('none').length + ' non renseignée(s)')
+      + '<div class="sheet-b"><h3 style="margin:0 0 8px">À faire</h3>' + (todo.length ? '<div class="tasks">' + todo.map(p => row(p, true)).join('') + '</div>' : '<div class="empty">Aucune demande en attente.</div>')
+      + (done.length ? '<h3 style="margin:18px 0 8px">Faites</h3><div class="tasks">' + done.map(p => row(p, false)).join('') + '</div>' : '')
+      + '<p class="small muted" style="margin-top:14px">Une demande se renseigne depuis la fiche du dossier (clic sur son nom) ou la fiche d\'une tâche.</p></div><div class="sheet-f"><button class="btn" data-act="close">Fermer</button></div>';
+  }
   /* Suivi des demandes d'informations du mois (tableau de bord) */
   function irDashboard(m) {
     const prods = list('productions').filter(p => p.month === m && clientOf(p.client_id));
