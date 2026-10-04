@@ -1194,3 +1194,15 @@ html[data-ui="v2"][data-side="color"] .side .side-rec .ri i { background: color-
 .ir-strip .ir-m { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ir-strip > svg:last-child { color: var(--faint); flex: none; }
 @media (max-width: 640px) { .ir-strip .ir-m { display: none; } .ir-strip > b { flex: 1; } }
+
+/* V26.198 : bandeau des demandes — place sous les cartes (Aujourd'hui) et dans le Planning ; fenêtre plus grande, lignes 40 % moins hautes */
+.kpis-today ~ .ir-strip, .dots + .ir-strip { margin: 12px 0 0; }
+.pc .ir-strip { margin: 0; }
+.sheet.st-irList { width: min(820px, calc(100vw - 32px)) !important; max-width: none !important; }
+.sheet.st-irList .info-row { padding-top: 4px !important; padding-bottom: 4px !important; min-height: 0 !important; gap: 10px; }
+.sheet.st-irList .info-row .ibox { width: 24px !important; height: 24px !important; min-width: 24px; border-radius: 7px; }
+.sheet.st-irList .info-row .ibox svg { width: 12px; height: 12px; }
+.sheet.st-irList .info-row .t b { font-size: 13.5px; line-height: 1.25; }
+.sheet.st-irList .info-row .t span { font-size: 11.5px; line-height: 1.25; }
+.sheet.st-irList .info-row .btn.sm { height: 26px; min-height: 0; padding: 0 10px; font-size: 12.5px; }
+.sheet.st-irList .tasks { gap: 6px; }

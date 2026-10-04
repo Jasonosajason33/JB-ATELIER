@@ -2687,8 +2687,8 @@
     // V26.167 : RC / collaborateur — rappels CFE, CVAE et capacité, puis conseils (étalement, aide, temps réels) sous les indicateurs
     const tips = mgr ? '' : helpFeedback(cid) + (mine ? timeReminder(cid) : '') + collabTip(cid);
 
-    return head + (team ? '' : unplBanner(cid)) + (mgr ? '' : cfeReminder(cid) + cvaeReminder(cid) + capNoticeCollab(cid)) + progressBanner(cid, ids) + irStrip(team ? ids : [cid])
-      + '<div class="carousel desk-grid kpis-today" data-keep="kpi-today">' + k1 + k2 + k3 + k4 + '</div><div class="dots" data-dots></div>'
+    return head + (team ? '' : unplBanner(cid)) + (mgr ? '' : cfeReminder(cid) + cvaeReminder(cid) + capNoticeCollab(cid)) + progressBanner(cid, ids)
+      + '<div class="carousel desk-grid kpis-today" data-keep="kpi-today">' + k1 + k2 + k3 + k4 + '</div><div class="dots" data-dots></div>' + irStrip(team ? ids : [cid]) // V26.198 : sous les cartes
       + (tips ? '<div class="today-tips">' + tips + '</div>' : '')
       + '<div class="split" style="margin-top:var(--gap)">'
       + '<div class="card anim-in" style="--i:5"><div class="card-h"><h2>' + (team ? 'Production de l\'équipe' : mine ? 'Ma production' : 'Production de ' + esc(c.name.split(' ')[0])) + '</h2><span class="badge hide-m">' + tasks.length + ' tâche' + (tasks.length > 1 ? 's' : '') + ' · ' + E.fmtMin(rg.l.total) + '</span><a class="btn sm" href="#/planning" data-act="goday" data-date="' + d + '">Planning' + ic('chevR', 'sm') + '</a></div>'
@@ -3274,7 +3274,7 @@
     if (!PC.timer) PC.timer = setInterval(pcTick, 30000);
     setTimeout(pcAfter, 0);
     return '<div class="print-title">Planning — ' + esc(S.planAll ? 'équipe' : cs[0].name) + ' — ' + esc(pcDateLabel()) + '</div><div class="pc">'
-      + pcKpis(sets) + pcToolbar(m) + pcFilters(m) + pcListFrame(sets, m) + (S.planMode !== 'month' ? pcLegend() : '')
+      + pcKpis(sets) + pcToolbar(m) + pcFilters(m) + irStrip(cs.map(c => c.id)) + pcListFrame(sets, m) + (S.planMode !== 'month' ? pcLegend() : '')
       + '<div id="pc-main">' + pcMain(sets, m) + '</div></div>';
   }
   /* Recherche : seule la partie planning + cartes est recalculée (le champ garde le focus) */
@@ -5455,7 +5455,7 @@
     group: el => { const p = el.dataset.key.split(':'); openSheet({ type: 'group', pid: p[1], date: p[2], cid: p[3] }); },
     'done-group': (el, e) => { e.stopPropagation(); finishGroup(groupFromKey(el.dataset.key)); },
     'lock-group': el => lockGroup(groupFromKey(el.dataset.key)),
-    'ir-list': el => openSheet({ type: 'irList', ids: (el.dataset.ids || '').split(',').filter(Boolean) }), // V26.197
+    'ir-list': el => openSheet({ type: 'irList', wide: true, ids: (el.dataset.ids || '').split(',').filter(Boolean) }), // V26.197
     ir: el => setInfoRequest(el.dataset.pid, el.dataset.v).then(r => { if (r === 'ok') toast(IR_LABEL[el.dataset.v] + ' — enregistré.', 'ok', null, 2500); }),
     lock: el => { const t = S.data.tasks.get(el.dataset.id); if (t) toggleLock(t); },
     alert: el => {

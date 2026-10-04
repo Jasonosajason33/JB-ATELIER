@@ -38,8 +38,8 @@
     // V26.167 : RC / collaborateur — rappels CFE, CVAE et capacité, puis conseils (étalement, aide, temps réels) sous les indicateurs
     const tips = mgr ? '' : helpFeedback(cid) + (mine ? timeReminder(cid) : '') + collabTip(cid);
 
-    return head + (team ? '' : unplBanner(cid)) + (mgr ? '' : cfeReminder(cid) + cvaeReminder(cid) + capNoticeCollab(cid)) + progressBanner(cid, ids) + irStrip(team ? ids : [cid])
-      + '<div class="carousel desk-grid kpis-today" data-keep="kpi-today">' + k1 + k2 + k3 + k4 + '</div><div class="dots" data-dots></div>'
+    return head + (team ? '' : unplBanner(cid)) + (mgr ? '' : cfeReminder(cid) + cvaeReminder(cid) + capNoticeCollab(cid)) + progressBanner(cid, ids)
+      + '<div class="carousel desk-grid kpis-today" data-keep="kpi-today">' + k1 + k2 + k3 + k4 + '</div><div class="dots" data-dots></div>' + irStrip(team ? ids : [cid]) // V26.198 : sous les cartes
       + (tips ? '<div class="today-tips">' + tips + '</div>' : '')
       + '<div class="split" style="margin-top:var(--gap)">'
       + '<div class="card anim-in" style="--i:5"><div class="card-h"><h2>' + (team ? 'Production de l\'équipe' : mine ? 'Ma production' : 'Production de ' + esc(c.name.split(' ')[0])) + '</h2><span class="badge hide-m">' + tasks.length + ' tâche' + (tasks.length > 1 ? 's' : '') + ' · ' + E.fmtMin(rg.l.total) + '</span><a class="btn sm" href="#/planning" data-act="goday" data-date="' + d + '">Planning' + ic('chevR', 'sm') + '</a></div>'

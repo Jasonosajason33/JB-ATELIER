@@ -281,7 +281,7 @@
     if (!PC.timer) PC.timer = setInterval(pcTick, 30000);
     setTimeout(pcAfter, 0);
     return '<div class="print-title">Planning — ' + esc(S.planAll ? 'équipe' : cs[0].name) + ' — ' + esc(pcDateLabel()) + '</div><div class="pc">'
-      + pcKpis(sets) + pcToolbar(m) + pcFilters(m) + pcListFrame(sets, m) + (S.planMode !== 'month' ? pcLegend() : '')
+      + pcKpis(sets) + pcToolbar(m) + pcFilters(m) + irStrip(cs.map(c => c.id)) + pcListFrame(sets, m) + (S.planMode !== 'month' ? pcLegend() : '')
       + '<div id="pc-main">' + pcMain(sets, m) + '</div></div>';
   }
   /* Recherche : seule la partie planning + cartes est recalculée (le champ garde le focus) */
