@@ -337,3 +337,36 @@ html[data-motion="reduced"] .pc-st.s-now { animation: none; }
   .pc-wrow .pc-who-f { display: none; }
   .pc-wgrid { grid-template-columns: var(--pc-w) repeat(5, minmax(172px, 1fr)); min-width: calc(var(--pc-w) + 5 * 172px); }
 }
+
+/* ---------- V26.187 : écran plus compact ---------- */
+/* L'en-tête de page remonte (onglet Planning uniquement) */
+html:has(#view .pc) .top { padding-top: 6px !important; padding-bottom: 6px !important; }
+.pc { gap: 10px; }
+/* Indicateurs : moitié moins hauts, libellé et chiffre sur une ligne */
+.pc-kpi { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 14px; border-radius: 12px; }
+.pc-kpi-l { font-size: 12.5px; }
+.pc-kpi-v { gap: 7px; }
+.pc-kpi-v b { font-size: 19px; }
+.pc-kpi-v small { font-size: 11px; }
+.pc-dot { width: 7px; height: 7px; }
+/* Demandes d'informations en rose */
+.pc { --pc-info: #E0479E; }
+html[data-theme="signature"] .pc, html[data-variant="aurora"] .pc, html[data-theme="nuit"] .pc { --pc-info: #F472B6; }
+.pc-dcol .pc-card { --pc-info: #E0479E; }
+html:is([data-theme="signature"], [data-variant="aurora"], [data-theme="nuit"]) .pc-dcol .pc-card { --pc-info: #F472B6; }
+/* Barre de filtres : moitié moins haute */
+.pc .pc-sel { height: 28px; padding: 0 26px 0 10px; font-size: 12px; border-radius: 8px; background-position: right 8px center; }
+.pc-search { height: 28px; padding: 0 10px; border-radius: 8px; }
+.pc-search input { font-size: 12px; }
+.pc-search svg { width: 13px; height: 13px; }
+.pc .btn.ghost.sm { height: 28px; padding: 0 10px; font-size: 12px; }
+/* Espace entre le planning et les cartes Activité / Tâches à affecter… */
+#pc-main > .pc-cards { margin-top: 16px; }
+@media (max-width: 760px) {
+  .pc-kpi { padding: 7px 10px; }
+  .pc-kpi-l { font-size: 11px; }
+  .pc-kpi-v b { font-size: 17px; }
+}
+#view .pc .pc-sel { height: 28px !important; min-height: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; line-height: 26px; }
+#view .pc .pc-search { height: 28px; min-height: 0; }
+#view .pc .pc-search input { height: 26px !important; min-height: 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }

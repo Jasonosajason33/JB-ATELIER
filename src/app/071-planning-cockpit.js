@@ -120,7 +120,6 @@
     const sel = (k, cur, opts, all) => '<select class="pc-sel' + (cur ? ' v2-active' : '') + '" data-ch="pc-f" data-k="' + k + '" aria-label="' + all + '"><option value="">' + all + '</option>' + opts.map(o => '<option value="' + esc(o[0]) + '"' + (o[0] === cur ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('') + '</select>';
     const who = cs.length > 1 ? '<select class="pc-sel pc-who-sel' + (S.planAll ? '' : ' v2-active') + '" data-ch="pc-who" aria-label="Collaborateurs"><option value="">Toute l\'équipe (' + cs.length + ')</option>' + cs.map(c => '<option value="' + c.id + '"' + (!S.planAll && S.collabId === c.id ? ' selected' : '') + '>' + esc(c.name) + (c.id === S.me.collaborator_id ? ' (moi)' : '') + '</option>').join('') + '</select>' : '';
     return '<div class="pc-filters no-print" data-keep="pc-filters">' + who
-      + sel('kind', f.kind, [['tenue', 'Tenue'], ['tva', 'Avec TVA du mois'], ['info', 'Demandes d\'infos'], ['dash', 'Tableaux de bord']], 'Tous les types')
       + sel('client', f.client, cls.map(c => [c.id, c.name]), 'Tous les dossiers')
       + sel('status', f.status, [['todo', 'À faire'], ['now', 'En cours'], ['late', 'En retard'], ['recv', 'À recevoir'], ['done', 'Terminées']], 'Tous les statuts')
       + '<label class="pc-search">' + ic('search', 'sm') + '<input type="search" data-in="pc-q" placeholder="Rechercher un dossier" value="' + esc(f.q) + '" aria-label="Rechercher un dossier"></label>'
