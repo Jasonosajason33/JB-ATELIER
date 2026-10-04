@@ -35,6 +35,9 @@
   // Rappel sur « Aujourd'hui » à partir du 1er mai (collaborateur : ses dossiers ; RC : aussi ceux de son équipe)
   function cvaeReminder(cid) {
     const y = Number(today().slice(0, 4)), td = today(); if (td < y + '-05-01') return '';
+    // V26.201 : rappel limité à la saison (1er mai → 30 juin) ; jamais pour une échéance antérieure au début d'utilisation de JB Flow.
+    // Après le 30 juin, les retards restent visibles dans le suivi CVAE (onglet TVA & autres impôts), sans bandeau sur Aujourd'hui.
+    if (td > y + '-06-30' || (startMonth() && startMonth() > cvaeDue(y).slice(0, 7))) return '';
     const mine = S.me && cid === S.me.collaborator_id;
     const l = (mine ? cvaeClients() : cvaeClients(cid)).filter(c => !cvaeDone(cvaeOf(c, y))); if (!l.length) return '';
     const due = cvaeDue(y), late = td > due, names = l.slice(0, 4).map(c => esc(c.name)).join(', ') + (l.length > 4 ? ' et ' + (l.length - 4) + ' autre(s)' : '');
