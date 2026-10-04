@@ -23,6 +23,8 @@
     S._pcOb = new Map();
   }
   /* Personnes affichées : toute l'équipe visible, ou une seule personne */
+  // V26.192 : une personne seule (collaborateur, apprenti) a la même organisation que le RC : semaine en grille, mois en frise
+  const pcSolo = () => visibleCollabs().length < 2;
   const pcScope = () => S.planAll ? visibleCollabs() : [collabOf(S.collabId)].filter(Boolean);
 
   /* Type de tâche (existant) : la tâche « production » est la tenue du dossier ; la TVA du mois vient du régime de TVA du dossier */
@@ -196,7 +198,7 @@
   /* ---------- Vue Semaine de l'équipe : une ligne par personne, une colonne par jour ---------- */
   function pcWeek(sets, m) {
     const x = ctx(), td = today(), start = E.startOfWeek(S.cursor), days = E.rangeDates(start, E.addDays(start, 4)), all = list('tasks'), win = E.windowOf(S.cursor.slice(0, 7), x.settings);
-    const head = '<div class="pc-wrow pc-whead"><div class="pc-who pc-who-h"><b>Équipe</b><span>Semaine</span></div>' + days.map(d => {
+    const head = '<div class="pc-wrow pc-whead"><div class="pc-who pc-who-h"><b>' + (S.planAll ? 'Équipe' : 'Planning') + '</b><span>Semaine</span></div>' + days.map(d => {
       const isT = d === td, hol = x.settings.holidays && E.holidayName(d);
       return '<div class="pc-wday' + (isT ? ' today' : '') + (d < win.start || d > win.end ? ' outwin' : '') + '" data-act="goday" data-date="' + d + '" role="button" tabindex="0" title="Ouvrir la journée"><b>' + (isT ? '<i class="pc-dot g"></i>' : '') + pcCap1(DAYS_S[E.dow(d) - 1].replace('.', '')) + ' ' + Number(d.slice(8)) + ' ' + MONTHS_S[Number(d.slice(5, 7)) - 1] + '</b>' + (isT ? '<span class="pc-now-pill">Aujourd\'hui</span>' : hol ? '<span class="small muted">Férié</span>' : '') + '</div>';
     }).join('') + '</div>';
@@ -261,9 +263,9 @@
     if (S.planMode === 'day') return pcDay(S.cursor, sets, m) + pcCards([S.cursor], sets, m);
     if (S.planMode === 'week') {
       const start = E.startOfWeek(S.cursor), days = E.rangeDates(start, E.addDays(start, 4));
-      return (S.planAll ? pcWeek(sets, m) : planWeek(pcScope()[0])) + pcCards(days, sets, m);
+      return (S.planAll || pcSolo() ? pcWeek(sets, m) : planWeek(pcScope()[0])) + pcCards(days, sets, m);
     }
-    if (S.planAll) { const g = teamGantt(E.monthDates(m).filter(d => E.dow(d) <= 5)); return isManager() ? g : g.replace('Jour surchargé', 'Jour au-delà de la capacité'); } // vocabulaire V26.173
+    if (S.planAll || pcSolo()) { const g = teamGantt(E.monthDates(m).filter(d => E.dow(d) <= 5)); return isManager() ? g : g.replace('Jour surchargé', 'Jour au-delà de la capacité'); } // vocabulaire V26.173
     return planMonth(pcScope()[0], m);
   }
   function pcView() {
