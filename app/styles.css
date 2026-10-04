@@ -1171,3 +1171,12 @@ html[data-ui="v2"][data-side="color"] .side .side-rec .ri i { background: color-
 .sheet.st-prodDetail table.t td { padding-top: 4px !important; padding-bottom: 4px !important; line-height: 1.3; font-size: 13.5px; }
 .sheet.st-prodDetail table.t th { padding-top: 6px; padding-bottom: 6px; }
 .sheet.st-prodDetail table.t .badge { padding: 1px 8px; line-height: 17px; font-size: 12px; }
+
+/* V26.196 : fenêtres — la barre de défilement reste dans la fenêtre (elle ne déborde plus sur les coins arrondis) */
+.sheet::-webkit-scrollbar, .sheet *::-webkit-scrollbar { width: 12px; height: 12px; }
+.sheet::-webkit-scrollbar-track, .sheet *::-webkit-scrollbar-track { background: transparent; }
+.sheet::-webkit-scrollbar-track:vertical { margin: 28px 0; }
+.sheet::-webkit-scrollbar-track:horizontal, .sheet *::-webkit-scrollbar-track:horizontal { margin: 0 16px; }
+.sheet::-webkit-scrollbar-thumb, .sheet *::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text, #111) 22%, transparent); border: 3px solid transparent; border-radius: 99px; background-clip: padding-box; }
+.sheet::-webkit-scrollbar-thumb:hover, .sheet *::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--text, #111) 38%, transparent); }
+.sheet::-webkit-scrollbar-corner, .sheet *::-webkit-scrollbar-corner { background: transparent; }
