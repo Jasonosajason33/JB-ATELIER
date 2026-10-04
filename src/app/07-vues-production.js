@@ -308,7 +308,7 @@
   function irStrip(ids) {
     const ps = irProds(ids); if (!ps.length) return '';
     const n = { faite: 0, a_faire: 0, non: 0, none: 0 }; ps.forEach(p => n[irState(p)]++);
-    return '<button class="ir-strip anim-in' + (n.a_faire ? ' todo' : '') + '" data-act="ir-list" data-ids="' + ids.filter(Boolean).join(',') + '" title="Voir la liste des demandes d\'informations">'
+    return '<button class="ir-strip anim-in' + (n.a_faire ? ' todo' : '') + '" data-act="ir-list" data-ids="' + ids.filter(Boolean).join(',') + '" aria-label="Voir la liste des demandes d\'informations">'
       + '<span class="ir-i">' + ic('mail', 'sm') + '</span><b>Demandes d\'informations</b>'
       + '<span class="ir-n ' + (n.a_faire ? 'o' : 'g') + '">' + (n.a_faire ? n.a_faire + ' à faire' : 'Rien à envoyer') + '</span>'
       + '<span class="ir-m">' + n.faite + ' faite' + (n.faite > 1 ? 's' : '') + ' · ' + n.non + ' non nécessaire' + (n.non > 1 ? 's' : '') + ' · ' + n.none + ' non renseignée' + (n.none > 1 ? 's' : '') + '</span>' + ic('chevR', 'sm') + '</button>';
