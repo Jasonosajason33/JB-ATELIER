@@ -1166,3 +1166,8 @@ body:has(#view .hello) .top { padding-bottom: 0 !important; }
 html[data-ui="v2"][data-side="color"] .side .side-rec .ri { background: #fff !important; color: var(--acc, var(--accent)) !important; }
 html[data-ui="v2"][data-side="color"] .side .side-rec .ri svg { color: var(--acc, var(--accent)) !important; }
 html[data-ui="v2"][data-side="color"] .side .side-rec .ri i { background: color-mix(in srgb, var(--acc, var(--accent)) 100%, #000 25%) !important; color: #fff !important; box-shadow: 0 0 0 2px #fff; }
+
+/* V26.195 : Vue d'ensemble — fenêtres des cartes « Production » (Dossiers, Reçus, Planifiés, Terminés, En retard) : lignes 40 % moins hautes */
+.sheet.st-prodDetail table.t td { padding-top: 4px !important; padding-bottom: 4px !important; line-height: 1.3; font-size: 13.5px; }
+.sheet.st-prodDetail table.t th { padding-top: 6px; padding-bottom: 6px; }
+.sheet.st-prodDetail table.t .badge { padding: 1px 8px; line-height: 17px; font-size: 12px; }
