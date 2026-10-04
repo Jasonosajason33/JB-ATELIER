@@ -14,5 +14,5 @@ window.APP_CONFIG = {
   SUPABASE_URL: 'https://dhswogpkfrzwanvxlpzr.supabase.co',        // ex. 'https://abcdefghijkl.supabase.co'
   SUPABASE_ANON_KEY: 'sb_publishable_ZTP2jNT4o2C40ObzQ2RU2w_mq233TdB',   // ex. 'sb_publishable_…' ou 'eyJhbGciOi…' (clé anon)
   APP_NAME: 'JB Flow',
-  APP_VERSION: 'V26.190'          // version affichée en bas de page : +1 à chaque modification demandée (V26.40 = 40e version)
+  APP_VERSION: 'V26.191'          // version affichée en bas de page : +1 à chaque modification demandée (V26.40 = 40e version)
 };

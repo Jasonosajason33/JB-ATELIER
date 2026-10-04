@@ -1161,3 +1161,8 @@ body:has(#view .hello) .top { padding-bottom: 0 !important; }
   #view .hello .mring { position: absolute; right: 0; top: 6px; margin: 0; }
   #view .hello:has(.mring) + * { margin-right: 132px; }
 }
+
+/* V26.191 : menu coloré — icône « Déclarer une réception » visible (pastille blanche, icône à la couleur du thème) */
+html[data-ui="v2"][data-side="color"] .side .side-rec .ri { background: #fff !important; color: var(--acc, var(--accent)) !important; }
+html[data-ui="v2"][data-side="color"] .side .side-rec .ri svg { color: var(--acc, var(--accent)) !important; }
+html[data-ui="v2"][data-side="color"] .side .side-rec .ri i { background: color-mix(in srgb, var(--acc, var(--accent)) 100%, #000 25%) !important; color: #fff !important; box-shadow: 0 0 0 2px #fff; }
