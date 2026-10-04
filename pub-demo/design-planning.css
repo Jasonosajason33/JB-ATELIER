@@ -377,3 +377,10 @@ html:is([data-theme="signature"], [data-variant="aurora"], [data-theme="nuit"]) 
 .pc-syn > div b { color: color-mix(in srgb, var(--sy) 85%, var(--text)); }
 .pc-syn > .sy-a { --sy: var(--pc-tenue); } .pc-syn > .sy-v { --sy: var(--pc-tva); } .pc-syn > .sy-t { --sy: #0EA2B4; } .pc-syn > .sy-g { --sy: var(--ok); }
 .pc-syn { gap: 8px; }
+
+/* ---------- V26.189 ---------- */
+/* Titre « Planning » / « Équipe » du plateau à la taille des titres de cartes (Activité…) */
+.pc-who-h b { font-size: 14px; font-weight: 650; }
+/* Indicateurs : libellés et zéros en noir (couleur du texte du thème) */
+.pc-kpi-l { color: var(--text); }
+.pc-kpi-v b.z { color: var(--text); }
