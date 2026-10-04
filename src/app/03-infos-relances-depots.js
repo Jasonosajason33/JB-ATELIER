@@ -109,9 +109,11 @@
   }
 
   /* Jauge circulaire de charge d'une journée */
-  function ringHtml(collabId, date) {
-    const c = collabOf(collabId), x = ctx();
-    const cap = E.capacityOn(c, date, x), l = E.loadOf(list('tasks'), collabId, date), lv = E.levelOf(l.total, cap, x.settings);
+  function ringHtml(collabId, date, ids) { // V26.190 : ids = plusieurs personnes (bouton « Équipe » d'Aujourd'hui) — capacités et activités additionnées
+    const c = collabOf(collabId), x = ctx(), all = list('tasks');
+    const cap = ids ? ids.reduce((s, id) => s + E.capacityOn(collabOf(id), date, x), 0) : E.capacityOn(c, date, x);
+    const l = ids ? ids.map(id => E.loadOf(all, id, date)).reduce((a, b) => ({ todo: a.todo + b.todo, done: a.done + b.done, total: a.total + b.total }), { todo: 0, done: 0, total: 0 }) : E.loadOf(all, collabId, date);
+    const lv = E.levelOf(l.total, cap, x.settings);
     const R = 52, C = 2 * Math.PI * R, base = Math.max(cap, l.total, 1);
     const dDone = C * l.done / base, dTodo = C * l.todo / base;
     const col = { green: 'var(--ok)', orange: 'var(--warn)', red: 'var(--bad)', off: 'var(--faint)' }[lv];
@@ -170,8 +172,8 @@
       return '<div class="unpl-bn ko">' + ic('alert', 'sm') + '<span><b>' + n + ' dossier' + (n > 1 ? 's non planifiés' : ' non planifié') + ' sur le mois de ' + esc(fMonth(mo)) + '</b> — ' + esc(names.slice(0, 4).join(', ')) + (names.length > 4 ? '…' : '') + '</span><button class="btn sm" data-act="go-unpl" data-m="' + mo + '">Voir</button></div>';
     }).join('') + '</div>';
   }
-  function progressBanner(cid) {    const x = ctx(), td = today(), m = td.slice(0, 7), w = E.windowOf(m, x.settings), c = collabOf(cid);
-    const mine = list('tasks').filter(t => t.month === m && (!cid || t.collaborator_id === cid));
+  function progressBanner(cid, ids) {    const x = ctx(), td = today(), m = td.slice(0, 7), w = E.windowOf(m, x.settings), c = collabOf(cid) || (ids && collabOf(ids[0])); // V26.190 : ids = équipe
+    const mine = list('tasks').filter(t => t.month === m && (ids ? ids.includes(t.collaborator_id) : !cid || t.collaborator_id === cid));
     const tot = mine.reduce((s, t) => s + (Number(t.duration_min) || 0), 0);
     const done = mine.filter(t => t.done).reduce((s, t) => s + (Number(t.duration_min) || 0), 0);
     const pct = tot ? Math.round(done / tot * 100) : 0;

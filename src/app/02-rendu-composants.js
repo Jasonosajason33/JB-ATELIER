@@ -267,8 +267,8 @@
     opts = opts || {};
     const cs = visibleCollabs();
     if (!cs.length || (!isManager() && cs.length < 2)) return '';
-    return '<div class="chips scroll" data-keep="chips-' + S.route + '">' + (opts.all ? '<button class="chip' + (!S.collabId ? ' on' : '') + '" data-act="collab" data-id="">Tous</button>' : '')
-      + cs.map(c => '<button class="chip' + (S.collabId === c.id ? ' on' : '') + '" data-act="collab" data-id="' + c.id + '"><span class="mini-av" style="background:' + esc(c.color || '#888') + '">' + esc(initials(c.name)) + '</span>' + esc(c.name) + (c.id === S.me.collaborator_id ? '<span class="small" style="opacity:.6">moi</span>' : '') + '</button>').join('') + '</div>';
+    return '<div class="chips scroll" data-keep="chips-' + S.route + '">' + (opts.pre || '') + (opts.all ? '<button class="chip' + (!S.collabId ? ' on' : '') + '" data-act="collab" data-id="">Tous</button>' : '')
+      + cs.map(c => '<button class="chip' + (S.collabId === c.id && !opts.none ? ' on' : '') + '" data-act="collab" data-id="' + c.id + '"><span class="mini-av" style="background:' + esc(c.color || '#888') + '">' + esc(initials(c.name)) + '</span>' + esc(c.name) + (c.id === S.me.collaborator_id ? '<span class="small" style="opacity:.6">moi</span>' : '') + '</button>').join('') + '</div>';
   }
   function monthNav() {
     return '<div class="month-pill"><button data-act="month" data-d="-1" aria-label="Mois précédent"' + (prevBlocked('month') ? ' disabled title="Premier mois d\'utilisation de JB Flow (modifiable dans Paramètres)"' : '') + '>' + ic('chevL', 'sm') + '</button><b class="cap">' + fMonth(S.month) + '</b><button data-act="month" data-d="1" aria-label="Mois suivant">' + ic('chevR', 'sm') + '</button></div>';

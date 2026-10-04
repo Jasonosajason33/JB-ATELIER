@@ -5,42 +5,44 @@
     if (!todayAsManager()) return vTodayCollab();
     const mgr = isManager();
     if (mgr && !collabs().length) return noCollabsHelp();
-    const d = today(), cid = mgr ? S.collabId : (S.collabId && canSeeCollab(S.collabId) ? S.collabId : S.me.collaborator_id), c = collabOf(cid);
+    const d = today(), vis = visibleCollabs(), team = mgr && !!S.todayTeam && vis.length > 1; // V26.190 : bouton « Équipe » (manager) — les cartes regroupent toute l'équipe visible
+    const ids = team ? vis.map(x => x.id) : null, idSet = new Set(ids || []);
+    const cid = team ? null : mgr ? S.collabId : (S.collabId && canSeeCollab(S.collabId) ? S.collabId : S.me.collaborator_id), c = collabOf(cid), key = team ? 'team' : cid;
     const first = (S.me.name || '').split(' ')[0];
     // V26.58 : en vue manager, le titre suit le collaborateur affiché (« Bonjour » seulement sur sa propre journée)
     const mine = c && c.id === S.me.collaborator_id;
-    const tasks = c ? withTimes(dayTasks(cid, d), d) : [], todo = tasks.filter(x => !x.t.done);
-    const rg = c ? ringHtml(cid, d) : null;
+    const tasks = team ? withTimes(dayTasks(null, d).filter(t => idSet.has(t.collaborator_id)), d) : c ? withTimes(dayTasks(cid, d), d) : [], todo = tasks.filter(x => !x.t.done);
+    const rg = team ? ringHtml(null, d, ids) : c ? ringHtml(cid, d) : null;
     const mood = !rg ? '' : !rg.cap ? 'Journée non travaillée : profite.' : !tasks.length ? 'Aucune production prévue aujourd\'hui.' : { green: 'Ta journée est bien équilibrée.', orange: 'Journée bien remplie : pense à souffler.', red: 'Journée très remplie : regarde ton planning.', off: '' }[msgLv(rg.lv, rg.l.total, rg.cap)]; // V26.185 : aucune phrase d'avertissement sous 108 %
-    const chips = collabChips();
-    const head = '<div class="hello anim-in"><div><div class="eyebrow cap">' + fDate(d) + (c && !mine ? (mgr ? ' · vue manager' : ' · ton binôme') : '') + '</div><h1>' + (mine || !c ? 'Bonjour, ' + esc(first) : 'Journée de ' + esc(c.name)) + '</h1>' + (mgr ? '' : flowQuoteHtml()) + '<p>'
-      + (c ? (mine ? (mgr ? 'Voici votre production du jour.' : mood) : 'Sa production du jour et ses clients à relancer.') : 'Bonjour, ' + esc(first) + ' — choisissez un collaborateur.') + '</p></div>' + (c ? monthRing(c.id) : '') + '</div>'
-      + (mgr || chips ? '<div style="margin-bottom:18px">' + chips + '</div>' : '');
-    if (!c) return head;
-    const al = alertsOf(engineData(), d, { collabId: cid }).filter(a => a.type !== 'near' || a.date === d);
+    // V26.190 : les noms des personnes sur la même ligne que le titre, au milieu de l'écran (les cartes remontent)
+    const chips = collabChips(mgr && vis.length > 1 ? { none: team, pre: '<button class="chip chip-team' + (team ? ' on' : '') + '" data-act="today-team" title="Regrouper toute l\'équipe dans les cartes">' + ic('users', 'sm') + 'Équipe<span class="small" style="opacity:.6">' + vis.length + '</span></button>' } : {});
+    const head = '<div class="hello anim-in"><div><div class="eyebrow cap">' + fDate(d) + (team ? ' · vue manager · équipe' : c && !mine ? (mgr ? ' · vue manager' : ' · ton binôme') : '') + '</div><div class="hello-row"><h1>' + (team ? 'Journée de l\'équipe' : mine || !c ? 'Bonjour, ' + esc(first) : 'Journée de ' + esc(c.name)) + '</h1>' + (chips ? '<div class="hello-chips">' + chips + '</div>' : '') + '</div>' + (mgr ? '' : flowQuoteHtml()) + '<p>'
+      + (team ? 'La production du jour des ' + vis.length + ' personnes de l\'équipe et leurs clients à relancer.' : c ? (mine ? (mgr ? 'Voici votre production du jour.' : mood) : 'Sa production du jour et ses clients à relancer.') : 'Bonjour, ' + esc(first) + ' — choisissez un collaborateur.') + '</p></div>' + (team ? monthRing(null) : c ? monthRing(c.id) : '') + '</div>';
+    if (!c && !team) return head;
+    const al = alertsOf(engineData(), d, team ? {} : { collabId: cid }).filter(a => (a.type !== 'near' || a.date === d) && (!team || !a.collab_id || idSet.has(a.collab_id)));
     const bad = al.filter(a => a.level === 'bad').length;
     const recs = list('productions').filter(p => awaitingRec(p) && p.expected_date <= E.addDays(d, 2) && p.month >= E.addMonths(d.slice(0, 7), -1))
-      .filter(p => { const cl = clientOf(p.client_id); return cl && cl.collaborator_id === cid; })
+      .filter(p => { const cl = clientOf(p.client_id); return cl && (team ? idSet.has(cl.collaborator_id) : cl.collaborator_id === cid); })
       .sort(recOrder); // V26.163 : le mois en cours d'abord
     const doneN = tasks.length - todo.length, pctDone = tasks.length ? Math.round(doneN / tasks.length * 100) : 0;
 
     const k1 = '<div class="kpi anim-in" style="--i:1"><div class="kpi-h"><span class="ibox">' + ic('gauge', 'sm') + '</span>Niveau d\'activité du jour</div>'
       + '<div class="load-card">' + rg.html + '<div class="legend-list"><div><span class="badge ' + LV_BADGE[msgLv(rg.lv, rg.l.total, rg.cap)] + '">' + lvLabel(msgLv(rg.lv, rg.l.total, rg.cap)) + '</span></div><div><i class="lg-sw hatch"></i>Réalisé<b>' + E.fmtMin(rg.l.done) + '</b></div><div><i class="lg-sw lv-' + rg.lv + '"></i>Reste à faire<b>' + E.fmtMin(rg.l.todo) + '</b></div><div><i class="lg-sw" style="background:var(--track)"></i>Disponible<b>' + E.fmtMin(Math.max(0, rg.cap - rg.l.total)) + '</b></div></div></div></div>';
-    const k2 = '<div class="kpi hero anim-in" style="--i:2"><div class="kpi-h"><span class="ibox">' + ic('list', 'sm') + '</span>Reste à faire</div><div class="v"><span data-count="' + todo.length + '" data-fmt="int" data-key="t-todo-' + cid + '">' + todo.length + '</span><small>tâche' + (todo.length > 1 ? 's' : '') + '</small></div>'
+    const k2 = '<div class="kpi hero anim-in" style="--i:2"><div class="kpi-h"><span class="ibox">' + ic('list', 'sm') + '</span>Reste à faire</div><div class="v"><span data-count="' + todo.length + '" data-fmt="int" data-key="t-todo-' + key + '">' + todo.length + '</span><small>tâche' + (todo.length > 1 ? 's' : '') + '</small></div>'
       + '<div class="foot">' + E.fmtMin(rg.l.todo) + ' · ' + doneN + ' terminée' + (doneN > 1 ? 's' : '') + '</div><div class="bar" style="background:rgba(255,255,255,.12)"><i style="width:' + pctDone + '%;background:var(--accent)"></i></div></div>';
-    const k3 = '<a class="kpi popk anim-in" style="--i:3" href="#/receptions"><span class="go">' + ic('arrowUR', 'sm') + '</span><div class="kpi-h"><span class="ibox">' + ic('inbox', 'sm') + '</span>Réceptions attendues</div><div class="v" data-count="' + recs.length + '" data-fmt="int" data-key="t-rec-' + cid + '">' + recs.length + '</div>'
+    const k3 = '<a class="kpi popk anim-in" style="--i:3" href="#/receptions"><span class="go">' + ic('arrowUR', 'sm') + '</span><div class="kpi-h"><span class="ibox">' + ic('inbox', 'sm') + '</span>Réceptions attendues</div><div class="v" data-count="' + recs.length + '" data-fmt="int" data-key="t-rec-' + key + '">' + recs.length + '</div>'
       + '<div class="foot">' + (recs.length ? esc(recs.slice(0, 2).map(p => clientOf(p.client_id).name).join(', ')) + (recs.length > 2 ? '…' : '') : 'Rien à déclarer d\'ici 2 jours') + '</div></a>';
-    const k4 = '<div class="kpi anim-in" style="--i:4"' + (al.length && mgr ? ' data-act="goto" data-r="dashboard"' : '') + '>' + (al.length && mgr ? '<span class="go">' + ic('arrowUR', 'sm') + '</span>' : '') + '<div class="kpi-h"><span class="ibox ' + (bad ? 'r' : al.length ? 'o' : 'g') + '">' + ic(bad ? 'alert' : 'check', 'sm') + '</span>Alertes</div><div class="v" data-count="' + al.length + '" data-fmt="int" data-key="t-al-' + cid + '">' + al.length + '</div>'
+    const k4 = '<div class="kpi anim-in" style="--i:4"' + (al.length && mgr ? ' data-act="goto" data-r="dashboard"' : '') + '>' + (al.length && mgr ? '<span class="go">' + ic('arrowUR', 'sm') + '</span>' : '') + '<div class="kpi-h"><span class="ibox ' + (bad ? 'r' : al.length ? 'o' : 'g') + '">' + ic(bad ? 'alert' : 'check', 'sm') + '</span>Alertes</div><div class="v" data-count="' + al.length + '" data-fmt="int" data-key="t-al-' + key + '">' + al.length + '</div>'
       + '<div class="foot clamp">' + (al.length ? esc(softText(al[0].text)) : 'Tout est sous contrôle') + '</div></div>';
     // V26.167 : RC / collaborateur — rappels CFE, CVAE et capacité, puis conseils (étalement, aide, temps réels) sous les indicateurs
     const tips = mgr ? '' : helpFeedback(cid) + (mine ? timeReminder(cid) : '') + collabTip(cid);
 
-    return head + unplBanner(cid) + (mgr ? '' : cfeReminder(cid) + cvaeReminder(cid) + capNoticeCollab(cid)) + progressBanner(cid)
+    return head + (team ? '' : unplBanner(cid)) + (mgr ? '' : cfeReminder(cid) + cvaeReminder(cid) + capNoticeCollab(cid)) + progressBanner(cid, ids)
       + '<div class="carousel desk-grid kpis-today" data-keep="kpi-today">' + k1 + k2 + k3 + k4 + '</div><div class="dots" data-dots></div>'
       + (tips ? '<div class="today-tips">' + tips + '</div>' : '')
       + '<div class="split" style="margin-top:var(--gap)">'
-      + '<div class="card anim-in" style="--i:5"><div class="card-h"><h2>' + (mine ? 'Ma production' : 'Production de ' + esc(c.name.split(' ')[0])) + '</h2><span class="badge hide-m">' + tasks.length + ' tâche' + (tasks.length > 1 ? 's' : '') + ' · ' + E.fmtMin(rg.l.total) + '</span><a class="btn sm" href="#/planning" data-act="goday" data-date="' + d + '">Planning' + ic('chevR', 'sm') + '</a></div>'
-      + (tasks.length ? '<div class="tasks">' + unitsOf(tasks).map((u, i) => unitRow(u, { i: i + 6 })).join('') + '</div><div class="swipe-hint only-m">' + (mgr ? 'Glissez une carte vers la droite pour la terminer (ou déclarer les éléments reçus), vers la gauche pour la verrouiller' : 'Glisse une carte vers la droite pour la terminer (ou déclarer les éléments reçus), vers la gauche pour la verrouiller') + '</div>' : '<div class="empty">Aucune tâche planifiée aujourd\'hui.</div>')
+      + '<div class="card anim-in" style="--i:5"><div class="card-h"><h2>' + (team ? 'Production de l\'équipe' : mine ? 'Ma production' : 'Production de ' + esc(c.name.split(' ')[0])) + '</h2><span class="badge hide-m">' + tasks.length + ' tâche' + (tasks.length > 1 ? 's' : '') + ' · ' + E.fmtMin(rg.l.total) + '</span><a class="btn sm" href="#/planning" data-act="goday" data-date="' + d + '">Planning' + ic('chevR', 'sm') + '</a></div>'
+      + (tasks.length ? '<div class="tasks">' + unitsOf(tasks).map((u, i) => unitRow(u, { i: i + 6, showCollab: team })).join('') + '</div><div class="swipe-hint only-m">' + (mgr ? 'Glissez une carte vers la droite pour la terminer (ou déclarer les éléments reçus), vers la gauche pour la verrouiller' : 'Glisse une carte vers la droite pour la terminer (ou déclarer les éléments reçus), vers la gauche pour la verrouiller') + '</div>' : '<div class="empty">Aucune tâche planifiée aujourd\'hui.</div>')
       + '</div><div>'
       + '<div class="frame anim-in rec-home-f" style="--i:6"><div class="frame-h">' + ic('inbox') + '<h2>Réceptions</h2>' + (recs.length ? '<input type="search" class="rec-q" data-in="recq" placeholder="Rechercher un dossier…" value="' + esc(S.recQ || '') + '" aria-label="Rechercher un dossier">' : '') + '<a class="btn sm" href="#/receptions">Tout voir</a></div><div class="inner">'
       + (recs.length ? '<div id="rec-home">' + recHomeList(recs, d) + '</div><button class="btn primary" style="width:100%;margin-top:12px" data-act="rec-validate"' + (S.recSel.size ? '' : ' disabled') + '>' + ic('check', 'sm') + 'Valider · ' + S.recSel.size + '</button>' : '<div class="empty">Aucun élément attendu d\'ici 2 jours.</div>')
