@@ -34,6 +34,8 @@
   const cabStart = () => /^\d{4}-\d{2}$/.test(planVal().start_month || '') ? planVal().start_month : '';
   const userStartOf = email => { const us = (planVal().user_start || {})[String(email || '').toLowerCase()]; return /^\d{4}-\d{2}$/.test(us || '') ? us : ''; };
   const startMonth = () => { const cab = cabStart(); if (!S.me || isManager()) return cab; const us = userStartOf(S.me.email); return us > cab ? us : cab; };
+  // V26.202 : exception accordée par l'administrateur (Paramètres › Utilisateurs) — la personne peut modifier tous les champs des fiches des dossiers qu'elle voit
+  const clientEditor = () => !!S.me && !S.readonly && (planVal().client_editors || []).map(x => String(x).toLowerCase()).includes(String(S.me.email || '').toLowerCase());
   const cfg = () => Object.assign({}, E.DEFAULT_SETTINGS, ((S.data.settings.get('planning') || {}).value) || {});
   // V26.73 : un administrateur peut prévisualiser l'application « comme un manager » (affichage uniquement)
   const realAdmin = () => !!((S.realMe || S.me) && (S.realMe || S.me).role === 'admin'); // V26.144 : S.realMe = l'administrateur quand il regarde l'application « en tant que » quelqu'un
@@ -3947,7 +3949,7 @@
   function sheetClient(s) {
     const isNew = !s.id, c = isNew ? s.draft : S.data.clients.get(s.id);
     if (!c) return '';
-    const ro = S.readonly || !(isManager() || (isRC() && (isNew || binomeIds().has(c.collaborator_id)))) ? ' disabled' : ''; // V26.145 : le RC crée et règle les dossiers de son équipe
+    const ro = S.readonly || !(isManager() || (isRC() && (isNew || binomeIds().has(c.collaborator_id))) || (!isNew && clientEditor() && canSeeCollab(c.collaborator_id))) ? ' disabled' : ''; // V26.202 : exception « modifier les fiches dossiers » // V26.145 : le RC crée et règle les dossiers de son équipe
     const f = (k, l, v, type, extra) => '<label class="f"><span>' + l + '</span><input type="' + (type || 'text') + '" data-ch="c-field" data-k="' + k + '" value="' + esc(v === null || v === undefined ? '' : v) + '"' + ro + (extra || '') + '></label>';
     const m = S.month, p = !isNew && list('productions').find(x => x.client_id === c.id && x.month === m);
     const ts = p ? list('tasks').filter(t => t.production_id === p.id).sort((a, b) => E.KINDS.indexOf(a.kind) - E.KINDS.indexOf(b.kind)) : [];
@@ -4022,6 +4024,8 @@
       + (['manager', 'admin'].includes(u.role || 'collab') ? '' : '<label class="f" style="grid-column:1/-1"><span>Début d\'utilisation (première période de TVA)</span><select data-ch="u-start">' + (isNew ? startOptions(s.draft.start || defaultMonth(), cabStart()) : startOptions(userStartOf(u.email), cabStart(), true)) + '</select></label>') + '</div>'
       + (['manager', 'admin'].includes(u.role || 'collab') ? '' : '<p class="small muted" style="margin:-4px 0 0">Avant ce mois, rien n\'apparaît pour cette personne : ni dossiers, ni réceptions, ni relances, ni historique. Le manager garde la vue de tout le cabinet.</p>')
       + (!isNew ? '<label class="cb"><input type="checkbox" data-ch="u-field" data-k="active"' + (u.active ? ' checked' : '') + '> Accès actif</label>' : '')
+      // V26.202 : exception — modifier tous les paramètres des fiches de ses dossiers (administrateur seulement)
+      + (!isNew && isAdmin() && !['manager', 'admin'].includes(u.role || 'collab') ? '<label class="cb" style="grid-column:1/-1"><input type="checkbox" data-ch="u-cedit"' + ((cfg().client_editors || []).map(x => String(x).toLowerCase()).includes(String(u.email || '').toLowerCase()) ? ' checked' : '') + '> <b>Exception</b> : peut modifier tous les paramètres des fiches de ses dossiers</label>' : '')
       + '<div class="notice small"><b>Administrateur</b> : tout le cabinet, paramètres, équipes, utilisateurs.<br><b>Manager</b> : tout le planning de ses équipes et la partie Pilotage (projection, agent, propositions), congés de ses collaborateurs.<br><b>Apprenti</b> : son planning (uniquement ses jours en entreprise) et celui de son tuteur. Réglez « Fonction : Apprenti », le tuteur et le calendrier de présence sur la fiche du collaborateur lié.<br><b>Membre</b> : son espace et celui de son binôme (un RC voit son ou ses collaborateurs, un collaborateur voit son RC). Qu\'il soit RC ou collaborateur se règle sur la fiche du collaborateur lié.</div>'
       + '</div><div class="sheet-f">' + (isNew ? '<button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="user-create">Ajouter</button>' : '<span class="small muted">Enregistrement automatique</span><button class="btn" data-act="close">Fermer</button>') + '</div>';
   }
@@ -5589,6 +5593,12 @@
       const admins = list('app_users').filter(x => x.role === 'admin' && x.active);
       if (((k === 'role' && v !== 'admin') || (k === 'active' && !v)) && u.role === 'admin' && admins.length <= 1) { toast('Impossible : il doit rester au moins un administrateur actif.', 'warn'); renderSheet(); return; }
       saveUpdate('app_users', u.id, { [k]: v }, { history: { action: 'utilisateur', detail: { text: u.email + ' : ' + k + ' modifié' } } });
+    },
+    'u-cedit': async el => { // V26.202 : exception « modifier les fiches dossiers »
+      const u = S.sheet && S.data.app_users.get(S.sheet.id); if (!u || !isAdmin()) return;
+      const k = String(u.email || '').toLowerCase(), l = (cfg().client_editors || []).map(x => String(x).toLowerCase()).filter(x => x !== k);
+      if (el.checked) l.push(k);
+      if (await savePlanning({ client_editors: l }, k + ' : ' + (el.checked ? 'peut' : 'ne peut plus') + ' modifier les fiches dossiers')) toast(u.name + (el.checked ? ' peut maintenant modifier les fiches de ses dossiers.' : ' ne peut plus modifier les fiches dossiers.'), 'ok', null, 3500);
     },
     'u-start': async el => { // V26.168 : début d'utilisation propre à l'utilisateur (vide = comme le cabinet)
       const s = S.sheet; if (!s) return;

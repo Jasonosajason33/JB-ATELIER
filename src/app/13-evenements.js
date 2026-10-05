@@ -191,6 +191,12 @@
       if (((k === 'role' && v !== 'admin') || (k === 'active' && !v)) && u.role === 'admin' && admins.length <= 1) { toast('Impossible : il doit rester au moins un administrateur actif.', 'warn'); renderSheet(); return; }
       saveUpdate('app_users', u.id, { [k]: v }, { history: { action: 'utilisateur', detail: { text: u.email + ' : ' + k + ' modifié' } } });
     },
+    'u-cedit': async el => { // V26.202 : exception « modifier les fiches dossiers »
+      const u = S.sheet && S.data.app_users.get(S.sheet.id); if (!u || !isAdmin()) return;
+      const k = String(u.email || '').toLowerCase(), l = (cfg().client_editors || []).map(x => String(x).toLowerCase()).filter(x => x !== k);
+      if (el.checked) l.push(k);
+      if (await savePlanning({ client_editors: l }, k + ' : ' + (el.checked ? 'peut' : 'ne peut plus') + ' modifier les fiches dossiers')) toast(u.name + (el.checked ? ' peut maintenant modifier les fiches de ses dossiers.' : ' ne peut plus modifier les fiches dossiers.'), 'ok', null, 3500);
+    },
     'u-start': async el => { // V26.168 : début d'utilisation propre à l'utilisateur (vide = comme le cabinet)
       const s = S.sheet; if (!s) return;
       if (!s.id) { s.draft.start = el.value; return; }

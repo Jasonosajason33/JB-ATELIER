@@ -34,6 +34,8 @@
   const cabStart = () => /^\d{4}-\d{2}$/.test(planVal().start_month || '') ? planVal().start_month : '';
   const userStartOf = email => { const us = (planVal().user_start || {})[String(email || '').toLowerCase()]; return /^\d{4}-\d{2}$/.test(us || '') ? us : ''; };
   const startMonth = () => { const cab = cabStart(); if (!S.me || isManager()) return cab; const us = userStartOf(S.me.email); return us > cab ? us : cab; };
+  // V26.202 : exception accordée par l'administrateur (Paramètres › Utilisateurs) — la personne peut modifier tous les champs des fiches des dossiers qu'elle voit
+  const clientEditor = () => !!S.me && !S.readonly && (planVal().client_editors || []).map(x => String(x).toLowerCase()).includes(String(S.me.email || '').toLowerCase());
   const cfg = () => Object.assign({}, E.DEFAULT_SETTINGS, ((S.data.settings.get('planning') || {}).value) || {});
   // V26.73 : un administrateur peut prévisualiser l'application « comme un manager » (affichage uniquement)
   const realAdmin = () => !!((S.realMe || S.me) && (S.realMe || S.me).role === 'admin'); // V26.144 : S.realMe = l'administrateur quand il regarde l'application « en tant que » quelqu'un

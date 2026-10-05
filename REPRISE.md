@@ -1,4 +1,4 @@
-# JB Flow — fichier de reprise (état au 3 octobre 2026, version 26.201)
+# JB Flow — fichier de reprise (état au 3 octobre 2026, version 26.202)
 
 Coller ce fichier au début d'une nouvelle session Claude (cloud ou locale) pour reprendre le travail sans perte.
 Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraison, vocabulaire, module Révision, film).
@@ -7,7 +7,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - Application statique `app/` mise en ligne sur Cloudflare (https://jbflow.app-flow.workers.dev) depuis le dépôt GitHub « JB-FLOW-AUTOMATIC » (commande de build : `node build.js`). Base de données Supabase.
 - Sources : `src/app/NN-*.js`, assemblées dans `app/app.js` par `build.ps1` (PC sans Node) ou `build.js`.
 - Démo publiée (données fictives) : https://claude.ai/artifact/PaW1TkQGP4JfcWnmWqchyj — page `pub-demo/jbflow-demo.html`.
-- Tests du moteur : `app/tests/moteur.html` (7 tests, tous verts en 26.201).
+- Tests du moteur : `app/tests/moteur.html` (7 tests, tous verts en 26.202).
 - Dépôt de travail : GitHub « JB-ATELIER » (branche `claude/new-session-hylho7`) contient `app/`, `src/`, `supabase/`, `pub-demo/` et `sim/preview-cards.css`. Le dépôt « JB-FLOW-AUTOMATIC » (mis en ligne par Cloudflare) était resté en 26.45 au 3 octobre.
 - Outils de test automatisés (Edge sans fenêtre) : `sim/build-steps.ps1` + `sim/cdp-steps.ps1` ; aides `sim/crypto-helpers.js`.
 
@@ -22,7 +22,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - Aperçu « cartes de tâches fines + coche minimaliste » : visible seulement dans la démo (`sim/preview-cards.css`, ajouté à `pub-demo/design-effects.css` à chaque copie) — à valider avant intégration.
 - Après déploiement de la 26.181 et plus : ouvrir l'application avec le compte administrateur, dans sa propre vue, pour nettoyer automatiquement les doublons de tableaux de bord déjà enregistrés.
 
-## Dernières versions (26.176 → 26.201)
+## Dernières versions (26.176 → 26.202)
 - 26.176 : système d'animation commun aux 4 thèmes (`app/design-motion.css`, `src/app/021-mouvement.js` : FAST 140 / MEDIUM 200 / SLOW 280 ms, courbe cubic-bezier(.22, 1, .36, 1)).
 - 26.177 → 26.180 : cartes affinées (TVA, alertes, IS / CFE / CVAE, réceptions ajustées, historique, Dashboard Clients, fenêtre du Suivi TVA) ; effet de clic « ripple » (380 ms) ; doublons de tableaux de bord corrigés.
 - 26.181 : audit — plus aucune action ne gonfle un planning (temps d'un dossier scindé, demandes d'informations, réception partielle, génération du mois, création / import de dossiers).
@@ -46,6 +46,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - 26.199 : bandeau des demandes retiré du Planning (reste sur Aujourd'hui).
 - 26.200 : bandeau des demandes — plus de bulle au survol.
 - 26.201 : bandeau CVAE sur Aujourd'hui limité à la saison (1er mai → 30 juin) et jamais pour une échéance antérieure au premier mois d'utilisation ; le suivi CVAE garde les retards.
+- 26.202 : exception par utilisateur (Paramètres › Utilisateurs › fiche, case « Exception », administrateur seulement) : la personne peut modifier tous les paramètres des fiches de SES dossiers (`clientEditor()`, réglage `client_editors` = liste d'e-mails dans les paramètres de planification). À cocher pour Eva (eva.cadillon@inextenso.fr). La base (droits Supabase existants) n'autorise un membre qu'à modifier les dossiers de son binôme.
 
 ## Film de présentation (v3 du 1er octobre 2026 — à reprendre plus tard)
 - But : présenter JB Flow aux supérieurs. Lien : https://claude.ai/artifact/J1CXu3csSo28ST8YGcrTpH (v3 publiée).
