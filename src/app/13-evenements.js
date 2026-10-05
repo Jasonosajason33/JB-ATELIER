@@ -439,10 +439,18 @@
   document.addEventListener('dragstart', e => { const el = e.target.closest && e.target.closest('[data-drag]'); if (!el) return; e.dataTransfer.setData('text/plain', el.dataset.drag); e.dataTransfer.effectAllowed = 'move'; fxDragStart(el, e); }); // V26.176 : carte saisie mise en avant
   document.addEventListener('dragover', e => { const col = e.target.closest && e.target.closest('[data-drop]'); if (col) { e.preventDefault(); col.classList.add('drop'); } });
   document.addEventListener('dragleave', e => { const col = e.target.closest && e.target.closest('[data-drop]'); if (col && !col.contains(e.relatedTarget)) col.classList.remove('drop'); });
+  // V26.204 : vue Jour du Planning — repère sur la tâche visée (échange de place)
+  document.addEventListener('dragover', e => { const b = e.target.closest && e.target.closest('.pc-blk[data-id]'); document.querySelectorAll('.pc-blk.swap-t').forEach(x => { if (x !== b) x.classList.remove('swap-t'); }); if (b) b.classList.add('swap-t'); });
+  document.addEventListener('dragend', () => document.querySelectorAll('.pc-blk.swap-t').forEach(x => x.classList.remove('swap-t')));
   document.addEventListener('drop', e => {
     const col = e.target.closest && e.target.closest('[data-drop]'); if (!col) return;
     e.preventDefault(); col.classList.remove('drop');
+    document.querySelectorAll('.pc-blk.swap-t').forEach(x => x.classList.remove('swap-t'));
     const key = e.dataTransfer.getData('text/plain');
+    // V26.204 : déposée sur une autre tâche de la même personne, le même jour → les deux tâches échangent leur place
+    const tb = e.target.closest('.pc-blk[data-id]'), td0 = S.data.tasks.get(key);
+    if (tb && td0 && tb.dataset.id !== key) { const tt = S.data.tasks.get(tb.dataset.id); if (tt && tt.collaborator_id === td0.collaborator_id && E.onDay(td0, tb.dataset.date)) { pcSwap(td0, tt, tb.dataset.date); return; } }
+    if (td0 && td0.locked && (td0.planned_date !== col.dataset.drop || (col.dataset.dc && td0.collaborator_id !== col.dataset.dc))) { toast('Tâche verrouillée : déverrouillez-la (fiche de la tâche) pour la changer de jour ou de personne.', 'warn', null, 3500); return; }
     const dc = col.dataset.dc || null; // V26.74 : colonne d'un autre planning (tuteur / apprenti)
     // V26.176 : la carte glisse ensuite de l'endroit où elle a été lâchée jusqu'à sa place définitive
     if (key.startsWith('g:')) { const ts = groupFromKey(key); if (ts.length && (ts[0].planned_date !== col.dataset.drop || (dc && ts[0].collaborator_id !== dc))) { fxDrop(key, e); moveGroup(ts, col.dataset.drop, dc); } return; }

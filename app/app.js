@@ -625,9 +625,17 @@
     return list('tasks').filter(t => E.onDay(t, date) && (!collabId || t.collaborator_id === collabId))
       .sort((a, b) => (a.collaborator_id || '').localeCompare(b.collaborator_id || '') || (a.seq - b.seq) || E.KINDS.indexOf(a.kind) - E.KINDS.indexOf(b.kind));
   }
+  /* V26.204 : pause déjeuner (12:30 → 13:30 par défaut) — les heures affichées la sautent ; une tâche à cheval est coupée en deux parties */
+  const lunchOf = () => { const c = cfg(); return { a: E.parseClock(c.lunch_start || '12:30'), b: E.parseClock(c.lunch_end || '13:30') }; };
+  function clockSegs(st, m) {
+    const L = lunchOf(); if (L.b <= L.a) return [{ a: st, b: st + m }];
+    if (st >= L.a && st < L.b) st = L.b;
+    const e = st + m;
+    return st < L.a && e > L.a ? [{ a: st, b: L.a }, { a: L.b, b: L.b + e - L.a }] : [{ a: st, b: e }];
+  }
   function withTimes(tasks, date) {
     const m = E.parseClock(cfg().day_start), by = {};
-    return tasks.map(t => { const k = t.collaborator_id; if (!(k in by)) by[k] = m; const st = by[k]; by[k] += E.minutesOn(t, date) || 0; return { t, time: E.fmtClock(st), date }; });
+    return tasks.map(t => { const k = t.collaborator_id; if (!(k in by)) by[k] = m; const sg = clockSegs(by[k], E.minutesOn(t, date) || 0); by[k] = sg[sg.length - 1].b; return { t, time: E.fmtClock(sg[0].a), date, segs: sg }; });
   }
   function prodLine(p) {
     if (!p) return '';
@@ -3132,17 +3140,20 @@
       co ? co.name : 'Sans collaborateur', PC_ST[st.key] + (st.recv && st.key !== 'recv' ? ' · éléments attendus' : ''),
       !t.done && t.due_date ? 'Échéance ' + fDM(t.due_date) : '', t.locked ? 'Verrouillée : la replanification ne la déplace pas' : '', 'Cliquer pour ouvrir la fiche'].filter(Boolean).join('\n');
   }
+  // V26.204 : vue Jour — une tâche verrouillée se glisse aussi (pour changer l'ordre de la journée ; pas de changement de jour)
+  const pcDragDay = t => canEditTask(t) && !t.done && !S.readonly ? ' draggable="true" data-drag="' + t.id + '"' : '';
   const pcDrag = t => canEditTask(t) && !t.locked && !t.done && !S.readonly ? ' draggable="true" data-drag="' + t.id + '"' : '';
   const pcStDot = st => '<i class="pc-st s-' + st.key + '"' + (st.key === 'done' ? '>' + CHECK_SVG + '</i>' : '></i>');
   /* Bloc de la frise du jour : largeur = durée (30 min = moitié d'une heure) */
-  function pcBlock(it, d, h0, span) {
-    const t = it.t, c = clientOf(t.client_id) || { name: '?' }, ty = pcType(t), tva = pcTva(t), st = pcState(t, d, it), m = it.b - it.a;
-    const l = (it.a - h0) / span * 100, w = Math.max(m, 4) / span * 100;
-    return '<div class="pc-blk t-' + (ty.k === 'tenue' && tva ? 'tenue tv' : ty.k) + ' s-' + st.key + (st.recv ? ' fc' : '') + (t.locked ? ' lk' : '') + (m < 25 ? ' xs xxs' : m < 45 ? ' xs' : m < 80 ? ' sm' : '') + (S.flash.has(t.id) ? ' flash' : '') + (t._unsaved ? ' unsaved' : '') + (t._failed ? ' failed' : '')
-      + '" style="left:calc(' + l.toFixed(3) + '% + 2px);width:calc(' + w.toFixed(3) + '% - 4px)" role="button" tabindex="0" data-act="task" data-id="' + t.id + '" data-date="' + d + '" data-a="' + it.a + '" data-b="' + it.b + '"' + pcDrag(t) + ' title="' + esc(pcTip(t, st, it, d)) + '">'
+  function pcBlock(it, d, h0, span, sg, part, parts) {
+    sg = sg || it; part = part || 0; parts = parts || 1;
+    const t = it.t, c = clientOf(t.client_id) || { name: '?' }, ty = pcType(t), tva = pcTva(t), st = pcState(t, d, it), m = sg.b - sg.a;
+    const l = (sg.a - h0) / span * 100, w = Math.max(m, 4) / span * 100;
+    return '<div class="pc-blk t-' + (ty.k === 'tenue' && tva ? 'tenue tv' : ty.k) + ' s-' + st.key + (st.recv ? ' fc' : '') + (t.locked ? ' lk' : '') + (m < 25 ? ' xs xxs' : m < 45 ? ' xs' : m < 80 ? ' sm' : '') + (parts > 1 ? (part ? ' cont' : ' split') : '') + (S.flash.has(t.id) ? ' flash' : '') + (t._unsaved ? ' unsaved' : '') + (t._failed ? ' failed' : '')
+      + '" style="left:calc(' + l.toFixed(3) + '% + 2px);width:calc(' + w.toFixed(3) + '% - 4px)" role="button" tabindex="0" data-act="task" data-id="' + t.id + '" data-date="' + d + '" data-a="' + sg.a + '" data-b="' + sg.b + '"' + pcDragDay(t) + ' title="' + esc(pcTip(t, st, it, d)) + '">'
       + '<div class="pc-blk-k"><span>' + ty.label + '</span>' + (tva && ty.k === 'tenue' ? '<em>TVA</em>' : '') + pcStDot(st) + '</div>'
       + (m < 25 ? '<span class="pc-blk-i">' + (t.kind === 'info' ? ic('mail', 'sm') : '') + '</span>' : '') + '<div class="pc-blk-n">' + esc(c.name) + '</div>'
-      + '<div class="pc-blk-d">' + (st.key === 'now' ? '<b>En cours</b> · ' : '') + durLabel(t, d, true) + '</div></div>';
+      + '<div class="pc-blk-d">' + (st.key === 'now' ? '<b>En cours</b> · ' : '') + (parts > 1 ? (part ? 'suite · ' : 'partie 1 · ') + E.fmtMin(m) + ' sur ' : '') + durLabel(t, d, true) + '</div></div>';
   }
   /* Carte compacte (semaine, tâches à affecter) : 2 lignes, sans cadenas */
   function pcCard(t, d, o) {
@@ -3159,12 +3170,13 @@
   function pcDay(d, sets, m) {
     const x = ctx(), td = today(), st0 = E.parseClock(cfg().day_start), all = list('tasks');
     const rows = pcScope().map(c => {
-      const items = withTimes(dayTasks(c.id, d), d).map(it => { const a = E.parseClock(it.time), mm = E.minutesOn(it.t, d) || 0; return { t: it.t, a, b: a + mm }; });
+      const items = withTimes(dayTasks(c.id, d), d).map(it => ({ t: it.t, a: it.segs[0].a, b: it.segs[it.segs.length - 1].b, segs: it.segs }));
       const cap = E.capacityOn(c, d, x), load = E.loadOf(all, c.id, d).total;
       return { c, items, cap, load, ab: E.absenceOn(c.id, d, x) };
     });
     let h0 = Math.min(PC.H0, Math.floor(st0 / 60) * 60), h1 = PC.H1;
-    rows.forEach(r => { r.items.forEach(i => { h1 = Math.max(h1, Math.ceil(i.b / 60) * 60); }); if (r.cap) h1 = Math.max(h1, Math.ceil((st0 + r.cap) / 60) * 60); });
+    const capEndOf = cap => { const sg = clockSegs(st0, cap); return sg[sg.length - 1].b; }, L = lunchOf();
+    rows.forEach(r => { r.items.forEach(i => { h1 = Math.max(h1, Math.ceil(i.b / 60) * 60); }); if (r.cap) h1 = Math.max(h1, Math.ceil(capEndOf(r.cap) / 60) * 60); });
     h1 = Math.min(Math.max(h1, h0 + 60), 24 * 60);
     const span = h1 - h0, hours = span / 60, pos = v => ((v - h0) / span * 100).toFixed(3) + '%';
     const head = '<div class="pc-row pc-head"><div class="pc-who pc-who-h"><b>' + (S.planAll ? 'Équipe' : 'Planning') + '</b><span>' + rows.length + ' personne' + (rows.length > 1 ? 's' : '') + '</span></div><div class="pc-hours">'
@@ -3177,17 +3189,17 @@
       const f = pcFill(r.load, r.cap), hol = x.settings.holidays && E.holidayName(d), off = r.cap <= 0;
       const offLbl = hol ? 'Férié · ' + hol : r.ab && (r.ab.minutes === null || r.ab.minutes === undefined || r.ab.minutes === '') ? absLabel(r.ab) : r.c.kind === 'apprenti' ? 'École / hors entreprise' : 'Non travaillé';
       const shown = r.items.filter(i => pcMatch(i.t, pcState(i.t, d, i)));
-      const lastEnd = r.items.reduce((v, i) => Math.max(v, i.b), st0), capEnd = st0 + r.cap;
-      const ghost = !off && capEnd > lastEnd && d >= td && !pcFiltered() ? '<div class="pc-free" style="left:' + pos(lastEnd) + ';width:' + ((capEnd - lastEnd) / span * 100).toFixed(3) + '%" title="Disponible : ' + E.fmtMin(capEnd - lastEnd) + '"><span>' + (capEnd - lastEnd >= 50 ? 'Disponible · ' : '') + E.fmtMin(capEnd - lastEnd) + '</span></div>' : '';
-      const zones = '<i class="pc-zone" style="left:0;width:' + pos(st0) + '"></i>' + (off ? '' : '<i class="pc-zone" style="left:' + pos(Math.min(capEnd, h1)) + ';right:0"></i><i class="pc-capend' + (overAlert(r.load, r.cap) ? ' over' : '') + '" style="left:' + pos(Math.min(capEnd, h1)) + '"></i>');
+      const lastEnd = r.items.reduce((v, i) => Math.max(v, i.b), st0), capEnd = capEndOf(r.cap);
+      const ghost = !off && capEnd > lastEnd && d >= td && !pcFiltered() ? '<div class="pc-free" style="left:' + pos(lastEnd) + ';width:' + ((capEnd - lastEnd) / span * 100).toFixed(3) + '%" title="Disponible : ' + E.fmtMin(Math.max(0, r.cap - r.load)) + '"><span>' + (r.cap - r.load >= 50 ? 'Disponible · ' : '') + E.fmtMin(Math.max(0, r.cap - r.load)) + '</span></div>' : '';
+      const zones = '<i class="pc-zone" style="left:0;width:' + pos(st0) + '"></i>' + (off || L.b <= L.a || L.b <= h0 || L.a >= h1 ? '' : '<i class="pc-lunch" style="left:' + pos(L.a) + ';width:' + ((L.b - L.a) / span * 100).toFixed(3) + '%"><span>Pause</span></i>') + (off ? '' : '<i class="pc-zone" style="left:' + pos(Math.min(capEnd, h1)) + ';right:0"></i><i class="pc-capend' + (overAlert(r.load, r.cap) ? ' over' : '') + '" style="left:' + pos(Math.min(capEnd, h1)) + '"></i>');
       return '<div class="pc-row' + (off ? ' off' : '') + '"><div class="pc-who">' + pcAv(r.c) + '<div class="pc-who-t"><b>' + esc(r.c.name) + (r.c.id === S.me.collaborator_id ? ' <small>moi</small>' : '') + '</b><span>' + esc(PC_KIND[r.c.kind] || '') + '</span>'
         + '<span class="pc-who-load"><b>' + E.fmtMin(r.load) + '</b>' + (r.cap ? ' / ' + E.fmtMin(r.cap) : '') + '<span class="lbl"> planifiées</span></span>' + (off && !r.load ? '' : pcBar(f, true) + '<span class="pc-who-f f-' + f.cls + '">' + esc(f.txt) + '</span>') + '</div></div>'
-        + '<div class="pc-track" data-drop="' + d + '" data-dc="' + r.c.id + '">' + zones + (off ? '<span class="pc-off-l">' + esc(offLbl) + '</span>' : '') + ghost + shown.map(i => pcBlock(i, d, h0, span)).join('') + '</div></div>';
+        + '<div class="pc-track" data-drop="' + d + '" data-dc="' + r.c.id + '">' + zones + (off ? '<span class="pc-off-l">' + esc(offLbl) + '</span>' : '') + ghost + shown.map(i => i.segs.map((sg, k) => pcBlock(i, d, h0, span, sg, k, i.segs.length)).join('')).join('') + '</div></div>';
     }).join('');
     const n = pcNow(), now = d === td && n >= h0 && n <= h1 ? '<div class="pc-now" style="--p:' + ((n - h0) / span).toFixed(4) + '"><b>' + E.fmtClock(n) + '</b></div>' : '';
     return '<div class="card pc-board"><div class="pc-scroll" data-keep="pc-day"><div class="pc-tl" style="--hours:' + hours + '" data-h0="' + h0 + '" data-h1="' + h1 + '" data-date="' + d + '">' + head + unRow + body + now + '</div></div>'
       + (rows.some(r => r.items.length) || un.length ? '' : '<div class="empty" style="margin-top:12px">Aucune tâche ce jour-là.</div>')
-      + '<p class="pc-hint small muted no-print hide-m">Glissez une tâche sur la ligne d\'une personne pour la lui confier ce jour-là · cliquez pour ouvrir sa fiche. Les heures affichées enchaînent les tâches à partir de ' + esc(cfg().day_start) + ' (Paramètres).</p></div>';
+      + '<p class="pc-hint small muted no-print hide-m">Glissez une tâche sur une autre tâche de la même personne pour les intervertir, ou sur la ligne d\'une autre personne pour la lui confier · cliquez pour ouvrir la fiche · pause de 12:30 à 13:30. Les heures affichées enchaînent les tâches à partir de ' + esc(cfg().day_start) + ' (Paramètres).</p></div>';
   }
 
   /* ---------- Vue Semaine de l'équipe : une ligne par personne, une colonne par jour ---------- */
@@ -3307,6 +3319,19 @@
     const h0 = +tl.dataset.h0, h1 = +tl.dataset.h1, who = (tl.querySelector('.pc-row .pc-who') || {}).offsetWidth || 0;
     const p = Math.max(0, Math.min(1, (pcNow() - 60 - h0) / (h1 - h0)));
     sc.scrollLeft = Math.round(p * (tl.scrollWidth - who));
+  }
+  /* V26.204 : vue Jour — glisser une tâche sur une autre tâche de la même personne : les deux échangent leur place dans la journée */
+  async function pcSwap(a, b, d) {
+    if (!canEditTask(a) || !canEditTask(b) || a.id === b.id) return;
+    const order = dayTasks(a.collaborator_id, d), ia = order.findIndex(t => t.id === a.id), ib = order.findIndex(t => t.id === b.id);
+    if (ia < 0 || ib < 0) return;
+    order[ia] = b; order[ib] = a;
+    const items = order.map((t, i) => ({ t, seq: i + 1 })).filter(x => Number(x.t.seq) !== x.seq).map(x => ({ id: x.t.id, patch: { seq: x.seq } }));
+    if (!items.length) return;
+    preApply('tasks', items); S.flash.add(a.id); S.flash.add(b.id); render(); setTimeout(() => { S.flash.delete(a.id); S.flash.delete(b.id); }, 1200);
+    const r = await saveMany('tasks', items);
+    hist('deplacement', { entity: 'task', entity_id: a.id, client_id: a.client_id, detail: { text: 'Ordre de la journée du ' + fDM(d) + ' : ' + ((clientOf(a.client_id) || {}).name || '') + ' ⇄ ' + ((clientOf(b.client_id) || {}).name || '') } });
+    toast((r && (r.failed || r.conflict)) ? 'Ordre non enregistré entièrement — réessayez.' : 'Ordre modifié : ' + ((clientOf(a.client_id) || {}).name || '') + ' ⇄ ' + ((clientOf(b.client_id) || {}).name || '') + '.', (r && (r.failed || r.conflict)) ? 'warn' : 'ok', null, 2500);
   }
   /* Optimiser le planning : résumé avant toute proposition (rien n'est déplacé sans validation) */
   function pcOptStats(m) {
@@ -5842,10 +5867,18 @@
   document.addEventListener('dragstart', e => { const el = e.target.closest && e.target.closest('[data-drag]'); if (!el) return; e.dataTransfer.setData('text/plain', el.dataset.drag); e.dataTransfer.effectAllowed = 'move'; fxDragStart(el, e); }); // V26.176 : carte saisie mise en avant
   document.addEventListener('dragover', e => { const col = e.target.closest && e.target.closest('[data-drop]'); if (col) { e.preventDefault(); col.classList.add('drop'); } });
   document.addEventListener('dragleave', e => { const col = e.target.closest && e.target.closest('[data-drop]'); if (col && !col.contains(e.relatedTarget)) col.classList.remove('drop'); });
+  // V26.204 : vue Jour du Planning — repère sur la tâche visée (échange de place)
+  document.addEventListener('dragover', e => { const b = e.target.closest && e.target.closest('.pc-blk[data-id]'); document.querySelectorAll('.pc-blk.swap-t').forEach(x => { if (x !== b) x.classList.remove('swap-t'); }); if (b) b.classList.add('swap-t'); });
+  document.addEventListener('dragend', () => document.querySelectorAll('.pc-blk.swap-t').forEach(x => x.classList.remove('swap-t')));
   document.addEventListener('drop', e => {
     const col = e.target.closest && e.target.closest('[data-drop]'); if (!col) return;
     e.preventDefault(); col.classList.remove('drop');
+    document.querySelectorAll('.pc-blk.swap-t').forEach(x => x.classList.remove('swap-t'));
     const key = e.dataTransfer.getData('text/plain');
+    // V26.204 : déposée sur une autre tâche de la même personne, le même jour → les deux tâches échangent leur place
+    const tb = e.target.closest('.pc-blk[data-id]'), td0 = S.data.tasks.get(key);
+    if (tb && td0 && tb.dataset.id !== key) { const tt = S.data.tasks.get(tb.dataset.id); if (tt && tt.collaborator_id === td0.collaborator_id && E.onDay(td0, tb.dataset.date)) { pcSwap(td0, tt, tb.dataset.date); return; } }
+    if (td0 && td0.locked && (td0.planned_date !== col.dataset.drop || (col.dataset.dc && td0.collaborator_id !== col.dataset.dc))) { toast('Tâche verrouillée : déverrouillez-la (fiche de la tâche) pour la changer de jour ou de personne.', 'warn', null, 3500); return; }
     const dc = col.dataset.dc || null; // V26.74 : colonne d'un autre planning (tuteur / apprenti)
     // V26.176 : la carte glisse ensuite de l'endroit où elle a été lâchée jusqu'à sa place définitive
     if (key.startsWith('g:')) { const ts = groupFromKey(key); if (ts.length && (ts[0].planned_date !== col.dataset.drop || (dc && ts[0].collaborator_id !== dc))) { fxDrop(key, e); moveGroup(ts, col.dataset.drop, dc); } return; }

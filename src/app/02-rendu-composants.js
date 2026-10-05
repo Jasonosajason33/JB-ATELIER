@@ -278,9 +278,17 @@
     return list('tasks').filter(t => E.onDay(t, date) && (!collabId || t.collaborator_id === collabId))
       .sort((a, b) => (a.collaborator_id || '').localeCompare(b.collaborator_id || '') || (a.seq - b.seq) || E.KINDS.indexOf(a.kind) - E.KINDS.indexOf(b.kind));
   }
+  /* V26.204 : pause déjeuner (12:30 → 13:30 par défaut) — les heures affichées la sautent ; une tâche à cheval est coupée en deux parties */
+  const lunchOf = () => { const c = cfg(); return { a: E.parseClock(c.lunch_start || '12:30'), b: E.parseClock(c.lunch_end || '13:30') }; };
+  function clockSegs(st, m) {
+    const L = lunchOf(); if (L.b <= L.a) return [{ a: st, b: st + m }];
+    if (st >= L.a && st < L.b) st = L.b;
+    const e = st + m;
+    return st < L.a && e > L.a ? [{ a: st, b: L.a }, { a: L.b, b: L.b + e - L.a }] : [{ a: st, b: e }];
+  }
   function withTimes(tasks, date) {
     const m = E.parseClock(cfg().day_start), by = {};
-    return tasks.map(t => { const k = t.collaborator_id; if (!(k in by)) by[k] = m; const st = by[k]; by[k] += E.minutesOn(t, date) || 0; return { t, time: E.fmtClock(st), date }; });
+    return tasks.map(t => { const k = t.collaborator_id; if (!(k in by)) by[k] = m; const sg = clockSegs(by[k], E.minutesOn(t, date) || 0); by[k] = sg[sg.length - 1].b; return { t, time: E.fmtClock(sg[0].a), date, segs: sg }; });
   }
   function prodLine(p) {
     if (!p) return '';
