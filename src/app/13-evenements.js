@@ -447,6 +447,7 @@
     e.preventDefault(); col.classList.remove('drop');
     document.querySelectorAll('.pc-blk.swap-t').forEach(x => x.classList.remove('swap-t'));
     const key = e.dataTransfer.getData('text/plain');
+    if (col.dataset.drop === 'unpl') { const tu = S.data.tasks.get(key); if (tu) pcUnplan(tu); return; } // V26.205 : retour dans « À affecter »
     // V26.204 : déposée sur une autre tâche de la même personne, le même jour → les deux tâches échangent leur place
     const tb = e.target.closest('.pc-blk[data-id]'), td0 = S.data.tasks.get(key);
     if (tb && td0 && tb.dataset.id !== key) { const tt = S.data.tasks.get(tb.dataset.id); if (tt && tt.collaborator_id === td0.collaborator_id && E.onDay(td0, tb.dataset.date)) { pcSwap(td0, tt, tb.dataset.date); return; } }

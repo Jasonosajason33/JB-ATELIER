@@ -3183,8 +3183,8 @@
       + Array.from({ length: hours }, (_, i) => '<span style="left:' + (i / hours * 100).toFixed(3) + '%">' + E.fmtClock(h0 + i * 60) + '</span>').join('') + '<span class="end">' + E.fmtClock(h1) + '</span></div></div>';
     // tâches à affecter (non planifiées / sans collaborateur) : à glisser sur la ligne d'une personne
     const un = sets.unpl.filter(t => pcMatch(t, pcState(t, d, null)));
-    const unRow = un.length ? '<div class="pc-row pc-unpl"><div class="pc-who"><span class="pc-av ghost">' + ic('inbox', 'sm') + '</span><div class="pc-who-t"><b>À affecter</b><span>' + un.length + ' tâche' + (un.length > 1 ? 's' : '') + ' · ' + esc(fMonth(m).split(' ')[0]) + '</span></div></div>'
-      + '<div class="pc-unpl-list" data-keep="pc-unpl">' + un.map(t => pcCard(t, null, { who: S.planAll })).join('') + '</div></div>' : '';
+    const unRow = un.length || !S.readonly ? '<div class="pc-row pc-unpl"><div class="pc-who"><span class="pc-av ghost">' + ic('inbox', 'sm') + '</span><div class="pc-who-t"><b>À affecter</b><span>' + un.length + ' tâche' + (un.length > 1 ? 's' : '') + ' · ' + esc(fMonth(m).split(' ')[0]) + '</span></div></div>'
+      + '<div class="pc-unpl-list" data-keep="pc-unpl" data-drop="unpl">' + (un.length ? un.map(t => pcCard(t, null, { who: S.planAll })).join('') : '<span class="pc-unpl-empty">Glissez ici une tâche pour la remettre « à affecter »</span>') + '</div></div>' : '';
     const body = rows.map(r => {
       const f = pcFill(r.load, r.cap), hol = x.settings.holidays && E.holidayName(d), off = r.cap <= 0;
       const offLbl = hol ? 'Férié · ' + hol : r.ab && (r.ab.minutes === null || r.ab.minutes === undefined || r.ab.minutes === '') ? absLabel(r.ab) : r.c.kind === 'apprenti' ? 'École / hors entreprise' : 'Non travaillé';
@@ -3210,7 +3210,7 @@
       return '<div class="pc-wday' + (isT ? ' today' : '') + (d < win.start || d > win.end ? ' outwin' : '') + '" data-act="goday" data-date="' + d + '" role="button" tabindex="0" title="Ouvrir la journée"><b>' + (isT ? '<i class="pc-dot g"></i>' : '') + pcCap1(DAYS_S[E.dow(d) - 1].replace('.', '')) + ' ' + Number(d.slice(8)) + ' ' + MONTHS_S[Number(d.slice(5, 7)) - 1] + '</b>' + (isT ? '<span class="pc-now-pill">Aujourd\'hui</span>' : hol ? '<span class="small muted">Férié</span>' : '') + '</div>';
     }).join('') + '</div>';
     const un = sets.unpl.filter(t => pcMatch(t, pcState(t, null, null)));
-    const unRow = un.length ? '<div class="pc-unpl pc-unpl-w"><div class="pc-who"><span class="pc-av ghost">' + ic('inbox', 'sm') + '</span><div class="pc-who-t"><b>À affecter</b><span>' + un.length + ' tâche' + (un.length > 1 ? 's' : '') + ' · ' + esc(fMonth(m).split(' ')[0]) + '</span></div></div><div class="pc-unpl-list" data-keep="pc-unpl-w">' + un.map(t => pcCard(t, null, { who: S.planAll })).join('') + '</div></div>' : '';
+    const unRow = un.length || !S.readonly ? '<div class="pc-unpl pc-unpl-w"><div class="pc-who"><span class="pc-av ghost">' + ic('inbox', 'sm') + '</span><div class="pc-who-t"><b>À affecter</b><span>' + un.length + ' tâche' + (un.length > 1 ? 's' : '') + ' · ' + esc(fMonth(m).split(' ')[0]) + '</span></div></div><div class="pc-unpl-list" data-keep="pc-unpl-w" data-drop="unpl">' + (un.length ? un.map(t => pcCard(t, null, { who: S.planAll })).join('') : '<span class="pc-unpl-empty">Glissez ici une tâche pour la remettre « à affecter »</span>') + '</div></div>' : '';
     const rows = pcScope().map(c => {
       let tl = 0, tc = 0;
       const cells = days.map(d => {
@@ -3332,6 +3332,13 @@
     const r = await saveMany('tasks', items);
     hist('deplacement', { entity: 'task', entity_id: a.id, client_id: a.client_id, detail: { text: 'Ordre de la journée du ' + fDM(d) + ' : ' + ((clientOf(a.client_id) || {}).name || '') + ' ⇄ ' + ((clientOf(b.client_id) || {}).name || '') } });
     toast((r && (r.failed || r.conflict)) ? 'Ordre non enregistré entièrement — réessayez.' : 'Ordre modifié : ' + ((clientOf(a.client_id) || {}).name || '') + ' ⇄ ' + ((clientOf(b.client_id) || {}).name || '') + '.', (r && (r.failed || r.conflict)) ? 'warn' : 'ok', null, 2500);
+  }
+  /* V26.205 : remettre une tâche planifiée dans « À affecter » (déposée sur la ligne À affecter) — sa date est retirée et elle est déverrouillée */
+  async function pcUnplan(t) {
+    if (!t || t.done || !canEditTask(t)) return;
+    if (!t.planned_date) return;
+    const r = await saveUpdate('tasks', t.id, { planned_date: null, seq: 0, alloc: null, locked: false }, { history: { action: 'deplacement', entity: 'task', entity_id: t.id, client_id: t.client_id, detail: { kind: t.kind, from: t.planned_date, to: null, text: 'Remise à affecter' } } });
+    if (r === 'ok') toast(((clientOf(t.client_id) || {}).name || 'Tâche') + ' : remise dans « À affecter ».', 'ok', null, 2500);
   }
   /* Optimiser le planning : résumé avant toute proposition (rien n'est déplacé sans validation) */
   function pcOptStats(m) {
@@ -5875,6 +5882,7 @@
     e.preventDefault(); col.classList.remove('drop');
     document.querySelectorAll('.pc-blk.swap-t').forEach(x => x.classList.remove('swap-t'));
     const key = e.dataTransfer.getData('text/plain');
+    if (col.dataset.drop === 'unpl') { const tu = S.data.tasks.get(key); if (tu) pcUnplan(tu); return; } // V26.205 : retour dans « À affecter »
     // V26.204 : déposée sur une autre tâche de la même personne, le même jour → les deux tâches échangent leur place
     const tb = e.target.closest('.pc-blk[data-id]'), td0 = S.data.tasks.get(key);
     if (tb && td0 && tb.dataset.id !== key) { const tt = S.data.tasks.get(tb.dataset.id); if (tt && tt.collaborator_id === td0.collaborator_id && E.onDay(td0, tb.dataset.date)) { pcSwap(td0, tt, tb.dataset.date); return; } }
