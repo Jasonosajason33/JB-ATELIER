@@ -388,3 +388,21 @@ html:is([data-theme="signature"], [data-variant="aurora"], [data-theme="nuit"]) 
 /* V26.193 : mois en cours — choix des jours affichés */
 .pc-mfrom { display: flex; justify-content: flex-end; margin-bottom: 8px; }
 .pc-mfrom .pc-sel { max-width: 320px; }
+
+/* ---------- V26.203 : listes ouvertes par les 4 indicateurs (et « À surveiller ») — lignes deux fois moins hautes, sur une ligne ---------- */
+#view .pc-frame .tasks { gap: 3px !important; }
+#view .pc-frame .tasks .swipe { border-radius: 9px; }
+#view .pc-frame .tasks .task { padding: 3px 8px 3px 14px !important; min-height: 0 !important; border-radius: 9px !important; gap: 8px !important; grid-template-columns: minmax(0, 1fr) auto !important; }
+#view .pc-frame .tasks .task::before { top: 6px !important; bottom: 6px !important; left: 5px !important; width: 3px !important; }
+#view .pc-frame .tasks .task > div:not(.time) { display: flex !important; align-items: center; gap: 10px; flex-wrap: nowrap; min-width: 0; overflow: hidden; }
+#view .pc-frame .tasks .task .tname { font-size: 12.5px !important; line-height: 18px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; max-width: 38%; }
+#view .pc-frame .tasks .task .meta { margin: 0 !important; font-size: 11px !important; gap: 5px !important; flex-wrap: nowrap !important; white-space: nowrap; overflow: hidden; min-width: 0; }
+#view .pc-frame .tasks .task .meta > * { white-space: nowrap; }
+#view .pc-frame .tasks .task .badge { font-size: 10.5px !important; line-height: 15px !important; padding: 0 6px !important; border-radius: 6px; }
+#view .pc-frame .tasks .task .badge svg { width: 10px; height: 10px; }
+#view .pc-frame .tasks .task .done-strip { margin: 0 !important; padding: 0 6px !important; font-size: 10.5px !important; line-height: 15px !important; white-space: nowrap; }
+#view .pc-frame .tasks .task .check { width: 18px !important; height: 18px !important; min-width: 18px; }
+#view .pc-frame .tasks .task .check svg { width: 10px; height: 10px; }
+#view .pc-frame .frame-h { padding-top: 10px; padding-bottom: 6px; }
+#view .pc-frame .inner > p.small { margin-bottom: 6px !important; font-size: 11.5px; }
+@media (max-width: 760px) { #view .pc-frame .tasks .task .tname { max-width: 55%; } }
