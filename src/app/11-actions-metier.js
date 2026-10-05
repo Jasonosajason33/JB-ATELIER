@@ -243,7 +243,12 @@
   }
   async function saveCollabField(c, k, v) {
     let val; try { val = parseField(k, v); } catch (e) { toast(e.message, 'warn'); renderSheet(); return; }
-    if (S.sheet && !S.sheet.id) { S.sheet.draft[k] = val; return; }
+    if (S.sheet && !S.sheet.id) {
+      S.sheet.draft[k] = val;
+      // V26.207 : contrat 39 h (7h48 par jour) pour un RC ou un collaborateur, 35 h (7 h) pour un apprenti
+      if (k === 'kind' && [420, 468].includes(Number(S.sheet.draft.daily_capacity_min))) { S.sheet.draft.daily_capacity_min = val === 'apprenti' ? 420 : 468; renderSheet(); }
+      return;
+    }
     await saveUpdate('collaborators', c.id, { [k]: val }, { history: { action: 'collaborateur', entity: 'collaborator', entity_id: c.id, detail: { text: c.name + ' : ' + k + ' modifié' } } });
   }
 

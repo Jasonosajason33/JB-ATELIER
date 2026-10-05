@@ -94,7 +94,9 @@
   /* ---------- En-tête : 4 indicateurs, puis la date ---------- */
   function pcKpis(sets) {
     const k = (id, label, n, tone, sub) => '<button class="pc-kpi' + (S.quick === id ? ' on' : '') + '" data-act="quick" data-q="' + id + '" title="' + esc(QUICK_TIP[id] || label) + '"><span class="pc-kpi-l">' + label + '</span><span class="pc-kpi-v"><i class="pc-dot ' + (n ? tone : 'z') + '"></i><b class="' + (n ? tone : 'z') + '" data-count="' + n + '" data-key="pck-' + id + '">' + n + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span></button>';
-    return '<div class="pc-kpis no-print">' + k('today', 'À traiter aujourd\'hui', sets.today.length, 'r') + k('late', 'En retard', sets.late.length, 'r') + k('recv', 'À recevoir', sets.recv.length, 'o') + k('done', 'Terminé', sets.done.length, 'g', 'ce mois') + '</div>';
+    // V26.207 : « Terminé » (un résultat, suivi dans Pilotage) laisse la place à « En attente client », sur lequel on agit
+    const wp = [...new Set(sets.wait.map(t => t.production_id))].map(id => S.data.productions.get(id)).filter(Boolean), due = wp.filter(p => (waitStage(p) || {}).due).length;
+    return '<div class="pc-kpis no-print">' + k('today', 'À traiter aujourd\'hui', sets.today.length, 'r') + k('late', 'En retard', sets.late.length, 'r') + k('recv', 'À recevoir', sets.recv.length, 'o') + k('wait', 'En attente client', wp.length, due ? 'r' : 'o', due ? due + ' relance' + (due > 1 ? 's' : '') + ' à faire' : '') + '</div>';
   }
   function pcDateLabel() {
     if (S.planMode === 'day') return pcCap1(fDate(S.cursor)) + ' ' + S.cursor.slice(0, 4);
@@ -242,27 +244,17 @@
     // À surveiller : uniquement des informations existantes
     const overDays = []; cs.forEach(c => dates.forEach(d => { const cap = E.capacityOn(c, d, x), l = E.loadOf(all, c.id, d).total; if (l > 0 && overAlert(l, cap)) overDays.push(d); }));
     const watch = [
-      sets.late.length && ['late', 'alert', 'r', 'En retard', sets.late.length],
       sets.soon.length && ['soon', 'flag', 'o', 'Échéances dans les ' + cfg().due_soon_days + ' jours', sets.soon.length],
       sets.info.length && ['info', 'mail', 'o', 'Demandes d\'infos à faire', sets.info.length],
-      sets.wait.length && (() => { const ps = [...new Set(sets.wait.map(t => t.production_id))].map(id => S.data.productions.get(id)).filter(Boolean), due = ps.filter(p => (waitStage(p) || {}).due).length; return ['wait', 'clock', due ? 'r' : 'o', 'En attente client' + (due ? ' · ' + due + ' relance' + (due > 1 ? 's' : '') + ' à faire' : ''), ps.length]; })(), // V26.206
-      sets.tvatodo.length && ['tvatodo', 'file', 'o', 'TVA à déposer (tenue terminée)', sets.tvatodo.length],
-      sets.recv.length && ['recv', 'inbox', 'b', 'Éléments attendus', sets.recv.length]
+      sets.tvatodo.length && ['tvatodo', 'file', 'o', 'TVA à déposer (tenue terminée)', sets.tvatodo.length] // V26.207 : « En retard », « Éléments attendus » et l'attente client sont en haut
     ].filter(Boolean);
     const sv = '<div class="card pc-c"><div class="pc-c-h"><h3>À surveiller</h3></div><div class="pc-watch">'
       + (overDays.length ? '<button class="pc-w-r" data-act="goday" data-date="' + overDays.sort()[0] + '"><span class="ibox r">' + ic('flame', 'sm') + '</span><span>' + (isManager() ? 'Journée' + (overDays.length > 1 ? 's' : '') + ' en surcharge' : 'Journée' + (overDays.length > 1 ? 's' : '') + ' très remplie' + (overDays.length > 1 ? 's' : '')) + ' (≥ ' + ALERT_PCT + ' %)</span><b>' + overDays.length + '</b>' + ic('chevR', 'sm') + '</button>' : '')
       + (S.failed.length ? '<button class="pc-w-r" data-act="retry"><span class="ibox r">' + ic('alert', 'sm') + '</span><span>Modifications non enregistrées</span><b>' + S.failed.length + '</b>' + ic('chevR', 'sm') + '</button>' : '')
       + watch.map(w => '<button class="pc-w-r' + (S.quick === w[0] ? ' on' : '') + '" data-act="quick" data-q="' + w[0] + '"><span class="ibox ' + w[2] + '">' + ic(w[1], 'sm') + '</span><span>' + w[3] + '</span><b>' + w[4] + '</b>' + ic('chevR', 'sm') + '</button>').join('')
       + (!overDays.length && !S.failed.length && !watch.length ? '<div class="pc-c-empty">' + ic('check', 'sm') + 'Rien à signaler.</div>' : '') + '</div></div>';
-    const ids = new Set(cs.map(c => c.id)), inRange = all.filter(t => ids.has(t.collaborator_id) && dates.some(d => E.onDay(t, d)));
-    const hrs = per.reduce((s, p) => s + p.l, 0), caps = per.reduce((s, p) => s + p.cap, 0), doneN = inRange.filter(t => t.done).length;
-    const syn = '<div class="card pc-c"><div class="pc-c-h"><h3>Synthèse</h3><span class="small muted">' + (isDay ? 'jour' : 'semaine') + '</span></div><div class="pc-syn">'
-      + '<div class="sy-a"><b data-count="' + inRange.length + '" data-key="pcs-n">' + inRange.length + '</b><span>tâche' + (inRange.length > 1 ? 's' : '') + (isDay ? ' ce jour' : ' cette semaine') + '</span></div>'
-      + '<div class="sy-v"><b>' + E.fmtMin(hrs) + '</b><span>planifiées' + (caps ? ' sur ' + E.fmtMin(caps) : '') + '</span></div>'
-      + '<div class="sy-t"><b>' + cs.length + '</b><span>collaborateur' + (cs.length > 1 ? 's' : '') + '</span></div>'
-      + '<div class="sy-g"><b>' + doneN + '</b><span>terminée' + (doneN > 1 ? 's' : '') + '</span></div></div>'
-      + '<div class="pc-syn-f small muted"><button class="lnk" data-act="quick" data-q="done">' + sets.done.length + ' tenue' + (sets.done.length > 1 ? 's' : '') + ' terminée' + (sets.done.length > 1 ? 's' : '') + ' en ' + esc(fMonth(m).split(' ')[0]) + '</button> · <button class="lnk" data-act="quick" data-q="tvasent">' + sets.tvasent.length + ' TVA envoyée' + (sets.tvasent.length > 1 ? 's' : '') + '</button></div></div>';
-    return '<div class="pc-cards">' + act + aff + sv + syn + '</div>';
+    // V26.207 : carte « Synthèse » retirée (ses chiffres doublaient Activité et les indicateurs du haut)
+    return '<div class="pc-cards">' + act + aff + sv + '</div>';
   }
 
   /* ---------- Écran ---------- */

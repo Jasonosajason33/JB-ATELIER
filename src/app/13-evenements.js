@@ -96,7 +96,7 @@
     'client-new': () => openSheet({ type: 'client', draft: { name: '', collaborator_id: S.clientCollab || null, frequency: 'mensuel', reception_day: 5, time_min: 0, vat_due_day: 19, priority: 2, notes: '' } }),
     'client-create': () => createClient(),
     'client-del': async el => { const c = clientOf(el.dataset.id); if (c && await confirmBox('Supprimer le dossier ?', '<p>Le dossier <b>' + esc(c.name) + '</b> et toute sa production (tous les mois) seront supprimés définitivement. Pour simplement l\'arrêter, décochez plutôt « Dossier actif ».</p>', 'Supprimer', true)) { if (await saveRemove('clients', c.id)) { list('productions').filter(p => p.client_id === c.id).forEach(p => S.data.productions.delete(p.id)); list('tasks').filter(t => t.client_id === c.id).forEach(t => S.data.tasks.delete(t.id)); hist('dossier', { detail: { text: 'Suppression d\'un dossier' } }); closeSheet(); } } },
-    'collab-new': () => openSheet({ type: 'collab', draft: { name: '', daily_capacity_min: 420, work_days: [1, 2, 3, 4, 5], color: COLORS[collabs(true).length % COLORS.length], active: true } }),
+    'collab-new': () => openSheet({ type: 'collab', draft: { name: '', daily_capacity_min: 468, work_days: [1, 2, 3, 4, 5], color: COLORS[collabs(true).length % COLORS.length], active: true } }),
     'collab-edit': el => openSheet({ type: 'collab', id: el.dataset.id }),
     'collab-create': async () => {
       const d = S.sheet.draft;
@@ -209,19 +209,20 @@
     },
     'co-reserve': async el => { // V26.206 : réserve pour imprévus d'une personne (vide = comme le cabinet)
       const s = S.sheet, c = s && S.data.collaborators.get(s.id); if (!c) return;
-      const by = Object.assign({}, cfg().reserve_by || {}); if (el.value === '') delete by[c.id]; else by[c.id] = Number(el.value);
-      if (await savePlanning({ reserve_by: by }, c.name + ' : temps réservé aux imprévus ' + (el.value === '' ? 'comme le cabinet' : el.value + ' %'))) { renderSheet(); render(); toast('Imprévus de ' + c.name + ' : ' + (el.value === '' ? 'comme le cabinet' : el.value + ' %') + '. « Replanifier le mois » l\'applique aux dossiers déjà placés.', 'ok', null, 5000); }
+      const by = Object.assign({}, cfg().reserve_min_by || {}); if (el.value === '') delete by[c.id]; else by[c.id] = Number(el.value);
+      const lbl = el.value === '' ? 'comme le cabinet' : Number(el.value) ? E.fmtMin(Number(el.value)) + ' par jour' : 'aucun';
+      if (await savePlanning({ reserve_min_by: by }, c.name + ' : temps réservé aux imprévus ' + lbl)) { renderSheet(); render(); toast('Imprévus de ' + c.name + ' : ' + lbl + '. « Replanifier le mois » l\'applique aux dossiers déjà placés.', 'ok', null, 5000); }
     },
     setting: el => {
       const k = el.dataset.k; let v = el.type === 'checkbox' ? el.checked : el.value;
       if (el.type === 'number') v = Number(v);
       if (k === 'info_request_min') { v = E.parseDuration(v); if (isNaN(v) || v <= 0) { toast('Durée illisible (ex. 45 min).', 'warn'); render(); return; } }
+      if (k === 'reserve_min') { const z = String(v).trim(); v = z === '' || /^0+$/.test(z) ? 0 : E.parseDuration(z); if (isNaN(v) || v < 0 || v > 240) { toast('Durée illisible (ex. 1h, 45 min, 0) — 4 h maximum.', 'warn'); render(); return; } const lb = v ? E.fmtMin(v) : 'aucun'; setTimeout(() => toast('Temps réservé aux imprévus : ' + lb + ' par jour. « Replanifier le mois » l\'applique aux dossiers déjà placés.', 'ok', null, 5000), 300); }
       if (k === 'quarter_months') v = String(v).split(/[^0-9]+/).map(Number).filter(n => n >= 1 && n <= 12);
       if (k === 'start_month') { v = String(v || '').trim(); if (v && !/^\d{4}-\d{2}$/.test(v)) { toast('Format attendu : AAAA-MM (ex. 2026-10).', 'warn'); render(); return; } } // V26.164
       const cur = S.data.settings.get('planning');
       const value = Object.assign({}, cfg(), { [k]: v });
       if (value.start_day >= value.end_day) { toast('Le début de période doit précéder la fin.', 'warn'); render(); return; }
-      if (k === 'reserve_pct') { v = Math.min(60, Math.max(0, Number(v) || 0)); setTimeout(() => toast('Temps réservé aux imprévus : ' + v + ' %. « Replanifier le mois » l\'applique aux dossiers déjà placés.', 'ok', null, 5000), 300); }
       if (k === 'info_request_min' && isManager()) setTimeout(() => toast('Durée des demandes d\'informations mise à jour : elle s\'applique aux nouvelles demandes.', 'ok', null, 5000), 300);
       if (cur) saveUpdate('settings', 'planning', { value }, { history: { action: 'parametres', detail: { text: k + ' = ' + JSON.stringify(v) } } }).then(r => { if (r === 'ok' && k === 'agent_enabled' && v) runAgent().then(() => render()); });
       else saveInsert('settings', [{ id: 'planning', value }]).catch(() => { });

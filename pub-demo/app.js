@@ -36,8 +36,8 @@
   const startMonth = () => { const cab = cabStart(); if (!S.me || isManager()) return cab; const us = userStartOf(S.me.email); return us > cab ? us : cab; };
   // V26.202 : exception accordée par l'administrateur (Paramètres › Utilisateurs) — la personne peut modifier tous les champs des fiches des dossiers qu'elle voit
   const clientEditor = () => !!S.me && !S.readonly && (planVal().client_editors || []).map(x => String(x).toLowerCase()).includes(String(S.me.email || '').toLowerCase());
-  // V26.206 : 20 % de chaque journée gardés pour les imprévus, par défaut (Paramètres › Planification, et par personne)
-  const cfg = () => Object.assign({}, E.DEFAULT_SETTINGS, { reserve_pct: 20 }, ((S.data.settings.get('planning') || {}).value) || {});
+  // V26.207 : 1 h par jour gardée pour les imprévus, par défaut (Paramètres › Planification, et par personne ; jamais pour un apprenti)
+  const cfg = () => Object.assign({}, E.DEFAULT_SETTINGS, { reserve_min: 60 }, ((S.data.settings.get('planning') || {}).value) || {});
   // V26.73 : un administrateur peut prévisualiser l'application « comme un manager » (affichage uniquement)
   const realAdmin = () => !!((S.realMe || S.me) && (S.realMe || S.me).role === 'admin'); // V26.144 : S.realMe = l'administrateur quand il regarde l'application « en tant que » quelqu'un
   const meName = () => ((S.realMe || S.me) || {}).name || '';
@@ -3105,7 +3105,9 @@
   /* ---------- En-tête : 4 indicateurs, puis la date ---------- */
   function pcKpis(sets) {
     const k = (id, label, n, tone, sub) => '<button class="pc-kpi' + (S.quick === id ? ' on' : '') + '" data-act="quick" data-q="' + id + '" title="' + esc(QUICK_TIP[id] || label) + '"><span class="pc-kpi-l">' + label + '</span><span class="pc-kpi-v"><i class="pc-dot ' + (n ? tone : 'z') + '"></i><b class="' + (n ? tone : 'z') + '" data-count="' + n + '" data-key="pck-' + id + '">' + n + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span></button>';
-    return '<div class="pc-kpis no-print">' + k('today', 'À traiter aujourd\'hui', sets.today.length, 'r') + k('late', 'En retard', sets.late.length, 'r') + k('recv', 'À recevoir', sets.recv.length, 'o') + k('done', 'Terminé', sets.done.length, 'g', 'ce mois') + '</div>';
+    // V26.207 : « Terminé » (un résultat, suivi dans Pilotage) laisse la place à « En attente client », sur lequel on agit
+    const wp = [...new Set(sets.wait.map(t => t.production_id))].map(id => S.data.productions.get(id)).filter(Boolean), due = wp.filter(p => (waitStage(p) || {}).due).length;
+    return '<div class="pc-kpis no-print">' + k('today', 'À traiter aujourd\'hui', sets.today.length, 'r') + k('late', 'En retard', sets.late.length, 'r') + k('recv', 'À recevoir', sets.recv.length, 'o') + k('wait', 'En attente client', wp.length, due ? 'r' : 'o', due ? due + ' relance' + (due > 1 ? 's' : '') + ' à faire' : '') + '</div>';
   }
   function pcDateLabel() {
     if (S.planMode === 'day') return pcCap1(fDate(S.cursor)) + ' ' + S.cursor.slice(0, 4);
@@ -3253,27 +3255,17 @@
     // À surveiller : uniquement des informations existantes
     const overDays = []; cs.forEach(c => dates.forEach(d => { const cap = E.capacityOn(c, d, x), l = E.loadOf(all, c.id, d).total; if (l > 0 && overAlert(l, cap)) overDays.push(d); }));
     const watch = [
-      sets.late.length && ['late', 'alert', 'r', 'En retard', sets.late.length],
       sets.soon.length && ['soon', 'flag', 'o', 'Échéances dans les ' + cfg().due_soon_days + ' jours', sets.soon.length],
       sets.info.length && ['info', 'mail', 'o', 'Demandes d\'infos à faire', sets.info.length],
-      sets.wait.length && (() => { const ps = [...new Set(sets.wait.map(t => t.production_id))].map(id => S.data.productions.get(id)).filter(Boolean), due = ps.filter(p => (waitStage(p) || {}).due).length; return ['wait', 'clock', due ? 'r' : 'o', 'En attente client' + (due ? ' · ' + due + ' relance' + (due > 1 ? 's' : '') + ' à faire' : ''), ps.length]; })(), // V26.206
-      sets.tvatodo.length && ['tvatodo', 'file', 'o', 'TVA à déposer (tenue terminée)', sets.tvatodo.length],
-      sets.recv.length && ['recv', 'inbox', 'b', 'Éléments attendus', sets.recv.length]
+      sets.tvatodo.length && ['tvatodo', 'file', 'o', 'TVA à déposer (tenue terminée)', sets.tvatodo.length] // V26.207 : « En retard », « Éléments attendus » et l'attente client sont en haut
     ].filter(Boolean);
     const sv = '<div class="card pc-c"><div class="pc-c-h"><h3>À surveiller</h3></div><div class="pc-watch">'
       + (overDays.length ? '<button class="pc-w-r" data-act="goday" data-date="' + overDays.sort()[0] + '"><span class="ibox r">' + ic('flame', 'sm') + '</span><span>' + (isManager() ? 'Journée' + (overDays.length > 1 ? 's' : '') + ' en surcharge' : 'Journée' + (overDays.length > 1 ? 's' : '') + ' très remplie' + (overDays.length > 1 ? 's' : '')) + ' (≥ ' + ALERT_PCT + ' %)</span><b>' + overDays.length + '</b>' + ic('chevR', 'sm') + '</button>' : '')
       + (S.failed.length ? '<button class="pc-w-r" data-act="retry"><span class="ibox r">' + ic('alert', 'sm') + '</span><span>Modifications non enregistrées</span><b>' + S.failed.length + '</b>' + ic('chevR', 'sm') + '</button>' : '')
       + watch.map(w => '<button class="pc-w-r' + (S.quick === w[0] ? ' on' : '') + '" data-act="quick" data-q="' + w[0] + '"><span class="ibox ' + w[2] + '">' + ic(w[1], 'sm') + '</span><span>' + w[3] + '</span><b>' + w[4] + '</b>' + ic('chevR', 'sm') + '</button>').join('')
       + (!overDays.length && !S.failed.length && !watch.length ? '<div class="pc-c-empty">' + ic('check', 'sm') + 'Rien à signaler.</div>' : '') + '</div></div>';
-    const ids = new Set(cs.map(c => c.id)), inRange = all.filter(t => ids.has(t.collaborator_id) && dates.some(d => E.onDay(t, d)));
-    const hrs = per.reduce((s, p) => s + p.l, 0), caps = per.reduce((s, p) => s + p.cap, 0), doneN = inRange.filter(t => t.done).length;
-    const syn = '<div class="card pc-c"><div class="pc-c-h"><h3>Synthèse</h3><span class="small muted">' + (isDay ? 'jour' : 'semaine') + '</span></div><div class="pc-syn">'
-      + '<div class="sy-a"><b data-count="' + inRange.length + '" data-key="pcs-n">' + inRange.length + '</b><span>tâche' + (inRange.length > 1 ? 's' : '') + (isDay ? ' ce jour' : ' cette semaine') + '</span></div>'
-      + '<div class="sy-v"><b>' + E.fmtMin(hrs) + '</b><span>planifiées' + (caps ? ' sur ' + E.fmtMin(caps) : '') + '</span></div>'
-      + '<div class="sy-t"><b>' + cs.length + '</b><span>collaborateur' + (cs.length > 1 ? 's' : '') + '</span></div>'
-      + '<div class="sy-g"><b>' + doneN + '</b><span>terminée' + (doneN > 1 ? 's' : '') + '</span></div></div>'
-      + '<div class="pc-syn-f small muted"><button class="lnk" data-act="quick" data-q="done">' + sets.done.length + ' tenue' + (sets.done.length > 1 ? 's' : '') + ' terminée' + (sets.done.length > 1 ? 's' : '') + ' en ' + esc(fMonth(m).split(' ')[0]) + '</button> · <button class="lnk" data-act="quick" data-q="tvasent">' + sets.tvasent.length + ' TVA envoyée' + (sets.tvasent.length > 1 ? 's' : '') + '</button></div></div>';
-    return '<div class="pc-cards">' + act + aff + sv + syn + '</div>';
+    // V26.207 : carte « Synthèse » retirée (ses chiffres doublaient Activité et les indicateurs du haut)
+    return '<div class="pc-cards">' + act + aff + sv + '</div>';
   }
 
   /* ---------- Écran ---------- */
@@ -3931,7 +3923,7 @@
       + num('annual_month', 'Mois des dossiers annuels', st.annual_month, 1, 12) + '</div><div class="row" style="margin-top:12px">'
       + chk('holidays', 'Jours fériés = non travaillés', st.holidays) + chk('auto_lock_on_move', 'Verrouiller automatiquement une tâche déplacée à la main', st.auto_lock_on_move) + '</div>'
       + '<div class="form" style="margin-top:14px"><label class="f"><span>Durée d\'une demande d\'informations (planning)</span><input type="text" data-ch="setting" data-k="info_request_min" value="' + E.fmtMin(st.info_request_min || 45) + '"></label>' + num('alert_from_day', 'Alerte « ne tiendra pas le ' + st.end_day + ' » à partir du', st.alert_from_day, 1, 28) + '</div><div class="row" style="margin-top:12px">' + chk('auto_create_month', 'Créer automatiquement les dossiers du mois en cours et du mois suivant (planning prospectif)', st.auto_create_month) + '</div>'
-      + '<div class="form" style="margin-top:14px">' + num('reserve_pct', 'Temps réservé aux imprévus (% de la journée)', st.reserve_pct, 0, 60) + '</div><p class="small muted" style="margin:6px 0 0">Appels, mails, questions internes : cette part de chaque journée n\'est jamais planifiée (20 % conseillé). Réglable aussi par personne, dans sa fiche.</p>'
+      + '<div class="form" style="margin-top:14px">' + '<label class="f"><span>Temps réservé aux imprévus, par jour</span><input type="text" data-ch="setting" data-k="reserve_min" value="' + (Number(st.reserve_min) ? E.fmtMin(Number(st.reserve_min)) : '0') + '"></label></div><p class="small muted" style="margin:6px 0 0">Appels, mails, questions internes : ce temps n\'est jamais planifié (1 h conseillée, ex. 7h48 de contrat → 6h48 planifiables). Réglable aussi par personne, dans sa fiche. Jamais appliqué aux apprentis.</p>'
       + '<div class="form" style="margin-top:14px">' + num('freeze_days', 'Zone figée : aujourd\'hui + jours ouvrés', st.freeze_days, 0, 5) + '</div><p class="small muted" style="margin:6px 0 0">Dans la zone figée, un dossier reçu déjà planifié n\'est pas déplacé quand un autre dossier arrive (sauf « Forcer » lors d\'une replanification).</p>'
       + '<div class="row" style="margin-top:12px">' + chk('agent_enabled', 'Agent de planification : apprend des mois précédents et ajuste les dates de réception prévues', st.agent_enabled) + '</div></div>'
       + '<div class="card"><div class="card-h"><h2>Historique pour l\'agent</h2><span class="small muted">' + S.data.learning_history.size + ' ligne(s) importée(s)</span></div>'
@@ -4176,9 +4168,9 @@
     const abs = isNew ? [] : list('absences').filter(a => a.collaborator_id === c.id).sort((a, b) => b.date_from.localeCompare(a.date_from));
     return sheetHead(isNew ? 'Nouveau collaborateur' : esc(c.name))
       + '<div class="sheet-b">' + remoteNotice(s) + '<div class="form"><label class="f"><span>Nom</span><input type="text" data-ch="co-field" data-k="name" value="' + esc(c.name || '') + '"></label>'
-      + '<label class="f"><span>Heures disponibles par jour</span><input type="text" data-ch="co-field" data-k="daily_capacity_min" value="' + E.fmtMin(c.daily_capacity_min) + '"></label>'
-      + (!isNew && (isManager() || isAdmin()) ? (() => { const by = cfg().reserve_by || {}, own = by[c.id] !== undefined && by[c.id] !== null && by[c.id] !== '', r = E.reserveOf(c, cfg()); // V26.206 : réserve pour imprévus propre à la personne
-        return '<label class="f"><span>Temps réservé aux imprévus</span><select data-ch="co-reserve"' + (S.readonly ? ' disabled' : '') + '><option value=""' + (own ? '' : ' selected') + '>Comme le cabinet (' + (Number(cfg().reserve_pct) || 0) + ' %)</option>' + [0, 10, 15, 20, 25, 30, 35, 40].map(v => '<option value="' + v + '"' + (own && Number(by[c.id]) === v ? ' selected' : '') + '>' + v + ' %</option>').join('') + '</select><em class="small muted">soit ' + E.fmtMin(Math.round((Number(c.daily_capacity_min) || 0) * (1 - r / 100))) + ' planifiables par jour</em></label>'; })() : '')
+      + '<label class="f"><span>Heures disponibles par jour</span><input type="text" data-ch="co-field" data-k="daily_capacity_min" value="' + E.fmtMin(c.daily_capacity_min) + '"><em class="small muted">soit ' + E.fmtMin((Number(c.daily_capacity_min) || 0) * ((c.work_days || []).length || 5)) + ' par semaine (contrat ' + (c.kind === 'apprenti' ? '35 h : 7h' : '39 h : 7h48') + ' par jour)</em></label>'
+      + (!isNew && (isManager() || isAdmin()) && c.kind !== 'apprenti' ? (() => { const by = cfg().reserve_min_by || {}, own = by[c.id] !== undefined && by[c.id] !== null && by[c.id] !== '', r = E.reserveOf(c, cfg()), cab = Number(cfg().reserve_min) || 0; // V26.207 : imprévus réservés à la personne, en minutes (jamais pour un apprenti)
+        return '<label class="f"><span>Temps réservé aux imprévus</span><select data-ch="co-reserve"' + (S.readonly ? ' disabled' : '') + '><option value=""' + (own ? '' : ' selected') + '>Comme le cabinet (' + (cab ? E.fmtMin(cab) : 'aucun') + ')</option>' + [0, 15, 30, 45, 60, 90, 120].map(v => '<option value="' + v + '"' + (own && Number(by[c.id]) === v ? ' selected' : '') + '>' + (v ? E.fmtMin(v) + ' par jour' : 'Aucun') + '</option>').join('') + '</select><em class="small muted">soit ' + E.fmtMin(Math.max(0, (Number(c.daily_capacity_min) || 0) - r)) + ' planifiables par jour</em></label>'; })() : '')
       + '<label class="f"><span>Couleur</span><input type="color" data-ch="co-field" data-k="color" value="' + esc(c.color || '#2f6fd0') + '" style="min-height:38px;width:100%"></label>'
       + (S.v8 ? '<label class="f"><span>Fonction</span><select data-ch="co-field" data-k="kind"' + (isAdmin() ? '' : ' disabled') + '><option value="collab"' + (c.kind !== 'rc' && c.kind !== 'apprenti' ? ' selected' : '') + '>Collaborateur comptable</option><option value="rc"' + (c.kind === 'rc' ? ' selected' : '') + '>Responsable client (RC)</option>' + (v17() ? '<option value="apprenti"' + (c.kind === 'apprenti' ? ' selected' : '') + '>Apprenti</option>' : '') + '</select></label>'
         + '<label class="f"><span>Équipe</span><select data-ch="co-field" data-k="team_id"' + (isAdmin() ? '' : ' disabled') + '><option value="">—</option>' + list('teams').sort(byName).map(tm => '<option value="' + tm.id + '"' + (tm.id === c.team_id ? ' selected' : '') + '>' + esc(tm.name) + '</option>').join('') + '</select></label>'
@@ -4476,7 +4468,12 @@
   }
   async function saveCollabField(c, k, v) {
     let val; try { val = parseField(k, v); } catch (e) { toast(e.message, 'warn'); renderSheet(); return; }
-    if (S.sheet && !S.sheet.id) { S.sheet.draft[k] = val; return; }
+    if (S.sheet && !S.sheet.id) {
+      S.sheet.draft[k] = val;
+      // V26.207 : contrat 39 h (7h48 par jour) pour un RC ou un collaborateur, 35 h (7 h) pour un apprenti
+      if (k === 'kind' && [420, 468].includes(Number(S.sheet.draft.daily_capacity_min))) { S.sheet.draft.daily_capacity_min = val === 'apprenti' ? 420 : 468; renderSheet(); }
+      return;
+    }
     await saveUpdate('collaborators', c.id, { [k]: val }, { history: { action: 'collaborateur', entity: 'collaborator', entity_id: c.id, detail: { text: c.name + ' : ' + k + ' modifié' } } });
   }
 
@@ -4726,7 +4723,7 @@
       const nameMap = new Map(collabs(true).map(c => [norm(c.name), c.id]));
       if (isManager() && imp.createCollabs && imp.newCollabs.length) {
         const n0 = collabs(true).length;
-        const created = await saveInsert('collaborators', imp.newCollabs.map((n, i) => ({ id: P.uuid(), name: n, daily_capacity_min: 420, work_days: [1, 2, 3, 4, 5], color: COLORS[(n0 + i) % COLORS.length], active: true })));
+        const created = await saveInsert('collaborators', imp.newCollabs.map((n, i) => ({ id: P.uuid(), name: n, daily_capacity_min: 468, work_days: [1, 2, 3, 4, 5], color: COLORS[(n0 + i) % COLORS.length], active: true })));
         created.forEach(c => nameMap.set(norm(c.name), c.id));
       }
       const ok = imp.rows.filter(r => !r.errors.length);
@@ -5683,7 +5680,7 @@
     'client-new': () => openSheet({ type: 'client', draft: { name: '', collaborator_id: S.clientCollab || null, frequency: 'mensuel', reception_day: 5, time_min: 0, vat_due_day: 19, priority: 2, notes: '' } }),
     'client-create': () => createClient(),
     'client-del': async el => { const c = clientOf(el.dataset.id); if (c && await confirmBox('Supprimer le dossier ?', '<p>Le dossier <b>' + esc(c.name) + '</b> et toute sa production (tous les mois) seront supprimés définitivement. Pour simplement l\'arrêter, décochez plutôt « Dossier actif ».</p>', 'Supprimer', true)) { if (await saveRemove('clients', c.id)) { list('productions').filter(p => p.client_id === c.id).forEach(p => S.data.productions.delete(p.id)); list('tasks').filter(t => t.client_id === c.id).forEach(t => S.data.tasks.delete(t.id)); hist('dossier', { detail: { text: 'Suppression d\'un dossier' } }); closeSheet(); } } },
-    'collab-new': () => openSheet({ type: 'collab', draft: { name: '', daily_capacity_min: 420, work_days: [1, 2, 3, 4, 5], color: COLORS[collabs(true).length % COLORS.length], active: true } }),
+    'collab-new': () => openSheet({ type: 'collab', draft: { name: '', daily_capacity_min: 468, work_days: [1, 2, 3, 4, 5], color: COLORS[collabs(true).length % COLORS.length], active: true } }),
     'collab-edit': el => openSheet({ type: 'collab', id: el.dataset.id }),
     'collab-create': async () => {
       const d = S.sheet.draft;
@@ -5796,19 +5793,20 @@
     },
     'co-reserve': async el => { // V26.206 : réserve pour imprévus d'une personne (vide = comme le cabinet)
       const s = S.sheet, c = s && S.data.collaborators.get(s.id); if (!c) return;
-      const by = Object.assign({}, cfg().reserve_by || {}); if (el.value === '') delete by[c.id]; else by[c.id] = Number(el.value);
-      if (await savePlanning({ reserve_by: by }, c.name + ' : temps réservé aux imprévus ' + (el.value === '' ? 'comme le cabinet' : el.value + ' %'))) { renderSheet(); render(); toast('Imprévus de ' + c.name + ' : ' + (el.value === '' ? 'comme le cabinet' : el.value + ' %') + '. « Replanifier le mois » l\'applique aux dossiers déjà placés.', 'ok', null, 5000); }
+      const by = Object.assign({}, cfg().reserve_min_by || {}); if (el.value === '') delete by[c.id]; else by[c.id] = Number(el.value);
+      const lbl = el.value === '' ? 'comme le cabinet' : Number(el.value) ? E.fmtMin(Number(el.value)) + ' par jour' : 'aucun';
+      if (await savePlanning({ reserve_min_by: by }, c.name + ' : temps réservé aux imprévus ' + lbl)) { renderSheet(); render(); toast('Imprévus de ' + c.name + ' : ' + lbl + '. « Replanifier le mois » l\'applique aux dossiers déjà placés.', 'ok', null, 5000); }
     },
     setting: el => {
       const k = el.dataset.k; let v = el.type === 'checkbox' ? el.checked : el.value;
       if (el.type === 'number') v = Number(v);
       if (k === 'info_request_min') { v = E.parseDuration(v); if (isNaN(v) || v <= 0) { toast('Durée illisible (ex. 45 min).', 'warn'); render(); return; } }
+      if (k === 'reserve_min') { const z = String(v).trim(); v = z === '' || /^0+$/.test(z) ? 0 : E.parseDuration(z); if (isNaN(v) || v < 0 || v > 240) { toast('Durée illisible (ex. 1h, 45 min, 0) — 4 h maximum.', 'warn'); render(); return; } const lb = v ? E.fmtMin(v) : 'aucun'; setTimeout(() => toast('Temps réservé aux imprévus : ' + lb + ' par jour. « Replanifier le mois » l\'applique aux dossiers déjà placés.', 'ok', null, 5000), 300); }
       if (k === 'quarter_months') v = String(v).split(/[^0-9]+/).map(Number).filter(n => n >= 1 && n <= 12);
       if (k === 'start_month') { v = String(v || '').trim(); if (v && !/^\d{4}-\d{2}$/.test(v)) { toast('Format attendu : AAAA-MM (ex. 2026-10).', 'warn'); render(); return; } } // V26.164
       const cur = S.data.settings.get('planning');
       const value = Object.assign({}, cfg(), { [k]: v });
       if (value.start_day >= value.end_day) { toast('Le début de période doit précéder la fin.', 'warn'); render(); return; }
-      if (k === 'reserve_pct') { v = Math.min(60, Math.max(0, Number(v) || 0)); setTimeout(() => toast('Temps réservé aux imprévus : ' + v + ' %. « Replanifier le mois » l\'applique aux dossiers déjà placés.', 'ok', null, 5000), 300); }
       if (k === 'info_request_min' && isManager()) setTimeout(() => toast('Durée des demandes d\'informations mise à jour : elle s\'applique aux nouvelles demandes.', 'ok', null, 5000), 300);
       if (cur) saveUpdate('settings', 'planning', { value }, { history: { action: 'parametres', detail: { text: k + ' = ' + JSON.stringify(v) } } }).then(r => { if (r === 'ok' && k === 'agent_enabled' && v) runAgent().then(() => render()); });
       else saveInsert('settings', [{ id: 'planning', value }]).catch(() => { });

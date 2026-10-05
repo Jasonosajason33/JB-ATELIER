@@ -28,7 +28,7 @@
     freeze_days: 1,          // zone figée : aujourd'hui + N jour(s) ouvré(s) ne sont pas bousculés (sauf replanification forcée)
     mid_day: 21,             // premier jalon d'échéances TVA suivi (« l'équipe tient le 21 »), en plus de la fin de période
     agent_enabled: true      // agent de planification : apprend des mois précédents (dates de réception, temps réels)
-    // V26.206 : reserve_pct (part de la journée gardée pour les imprévus, 0 si absent) et reserve_by {id: %}
+    // V26.207 : reserve_min (minutes gardées chaque jour pour les imprévus, 0 si absent) et reserve_min_by {id: minutes}
     // ne figurent pas ici, pour que le défaut de l'application (20 %) s'applique tant que rien n'est enregistré.
   };
 
@@ -194,14 +194,15 @@
       }
     }
     if (raw) return Math.max(0, cap);
-    return Math.max(0, Math.round(cap * (1 - reserveOf(collab, ctx.settings) / 100)));
+    return Math.max(0, cap - reserveOf(collab, ctx.settings));
   }
-  /* V26.206 — Temps réservé aux imprévus (en %) : réglage de la personne, sinon celui du cabinet. */
+  /* V26.207 — Temps réservé chaque jour aux imprévus (en minutes) : réglage de la personne, sinon celui du cabinet. */
   function reserveOf(collab, settings) {
-    const st = settings || {}, by = st.reserve_by || {}, v = collab && by[collab.id] !== undefined && by[collab.id] !== null && by[collab.id] !== '' ? by[collab.id] : st.reserve_pct;
-    return Math.min(60, Math.max(0, Number(v) || 0));
+    if (!collab || collab.kind === 'apprenti') return 0; // V26.207 : jamais d'imprévus réservés pour un apprenti
+    const st = settings || {}, by = st.reserve_min_by || {}, v = by[collab.id] !== undefined && by[collab.id] !== null && by[collab.id] !== '' ? by[collab.id] : st.reserve_min;
+    return Math.min(240, Math.max(0, Math.round(Number(v) || 0)));
   }
-  const prodDayCap = (collab, settings) => Math.round((Number(collab && collab.daily_capacity_min) || 0) * (1 - reserveOf(collab, settings) / 100));
+  const prodDayCap = (collab, settings) => Math.max(0, (Number(collab && collab.daily_capacity_min) || 0) - reserveOf(collab, settings));
   /* V26.206 — Dossier « en attente du client » : retiré du planning jusqu'à la réponse */
   const onHold = p => !!(p && p.filing && p.filing.wait);
   function absenceOn(collabId, date, ctx) {
