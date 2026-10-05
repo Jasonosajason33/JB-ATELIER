@@ -40,7 +40,7 @@
       var nm = new Date(now.getFullYear(), now.getMonth() + 1, 1), next = iso(nm).slice(0, 7);
       localStorage.setItem('planif-theme-chosen:lea@demo.local', '1'); localStorage.setItem('planif-theme-chosen:admin@demo.local', '1');
       db.app_users.push(Object.assign({}, adm, { id: 'u-eva', email: 'lea@demo.local', name: 'Léa Moreau', role: 'collab', collaborator_id: 'k-eva', active: true }));
-      db.collaborators.push({ id: 'k-eva', name: 'Léa', kind: 'collab', daily_capacity_min: 468, work_days: [1, 2, 3, 4, 5], active: true, version: 1, color: '#d946ef' });
+      db.collaborators.push({ id: 'k-eva', name: 'Léa', kind: 'collab', daily_capacity_min: 480, work_days: [1, 2, 3, 4, 5], active: true, version: 1, color: '#d946ef' });
       var pres = []; for (var i = 0; i < 60; i++) { var d = new Date(now); d.setDate(d.getDate() + i); if ([1, 2, 3].indexOf(d.getDay()) >= 0) pres.push(iso(d)); }
       db.collaborators.push({ id: 'k-chloe', name: 'Inès', kind: 'apprenti', tutor_id: null, presence_dates: pres, daily_capacity_min: 420, work_days: [1, 2, 3, 4, 5], active: true, version: 1, color: '#14b8a6' });
       var late = [['BOULANGERIE DES TILLEULS', 9], ['GARAGE DU MOULIN', 8], ['ATELIER HORIZON', 7], ['CAFÉ DES ARTS', 6], ['PLOMBERIE MARTEAU', 4]];
@@ -53,7 +53,7 @@
       // V27.00 : Léa surchargée le mois de production, Hugo disponible → réaffectations proposées (vue manager)
       db.app_users.push(Object.assign({}, adm, { id: 'u-karim', email: 'hugo@demo.local', name: 'Hugo Lefèvre', role: 'collab', collaborator_id: 'k-karim', active: true })); localStorage.setItem('planif-theme-chosen:hugo@demo.local', '1');
       db.collaborators.forEach(function (c) { if (c.id === 'k-eva') c.rc_id = 'k-karim'; });
-      db.collaborators.push({ id: 'k-karim', name: 'Hugo', kind: 'rc', daily_capacity_min: 468, work_days: [1, 2, 3, 4, 5], active: true, version: 1, color: '#0ea5e9' });
+      db.collaborators.push({ id: 'k-karim', name: 'Hugo', kind: 'rc', daily_capacity_min: 480, work_days: [1, 2, 3, 4, 5], active: true, version: 1, color: '#0ea5e9' });
       var pm = Number(iso(now).slice(8)) > 24 ? next : m, wdays = [];
       for (var dd = new Date(pm + '-01T12:00:00'); iso(dd).slice(0, 7) === pm && iso(dd).slice(8) <= '24'; dd.setDate(dd.getDate() + 1)) if (dd.getDay() >= 1 && dd.getDay() <= 5 && iso(dd) > iso(now)) wdays.push(iso(dd));
       var FZ = ['SAS EXEMPLE ALPHA', 'SARL BETA CONSEIL', 'GAMMA BÂTIMENT', 'DELTA TRANSPORTS', 'EPSILON DIGITAL', 'ZÊTA IMMOBILIER', 'ÊTA RESTAURATION', 'THÊTA SERVICES', 'IOTA COIFFURE', 'KAPPA INVEST', 'LAMBDA ÉVÉNEMENTS', 'MU PAYSAGES', 'NU TEXTILES', 'XI OPTIQUE', 'OMICRON SPORTS', 'PI MENUISERIE', 'RHÔ PRIMEURS', 'SIGMA SÉCURITÉ', 'TAU COURSIERS', 'UPSILON YOGA', 'PHI BOUTIQUE', 'CHI SERRURERIE', 'PSI CONSULTING', 'OMÉGA NETTOYAGE'];

@@ -37,7 +37,8 @@
   // V26.202 : exception accordée par l'administrateur (Paramètres › Utilisateurs) — la personne peut modifier tous les champs des fiches des dossiers qu'elle voit
   const clientEditor = () => !!S.me && !S.readonly && (planVal().client_editors || []).map(x => String(x).toLowerCase()).includes(String(S.me.email || '').toLowerCase());
   // V26.207 : 1 h par jour gardée pour les imprévus, par défaut (Paramètres › Planification, et par personne ; jamais pour un apprenti)
-  const cfg = () => Object.assign({}, E.DEFAULT_SETTINGS, { reserve_min: 60 }, ((S.data.settings.get('planning') || {}).value) || {});
+  const cfg = () => Object.assign({}, E.DEFAULT_SETTINGS, { reserve_min: 60, contract_hours: true }, // V26.208 : horaires des contrats (39 h / 35 h)
+      ((S.data.settings.get('planning') || {}).value) || {});
   // V26.73 : un administrateur peut prévisualiser l'application « comme un manager » (affichage uniquement)
   const realAdmin = () => !!((S.realMe || S.me) && (S.realMe || S.me).role === 'admin'); // V26.144 : S.realMe = l'administrateur quand il regarde l'application « en tant que » quelqu'un
   const meName = () => ((S.realMe || S.me) || {}).name || '';
@@ -3487,6 +3488,31 @@
     return '<div class="fb-gap"><div class="small muted" style="margin:12px 0 6px"><b style="color:var(--text)">Temps prévu / temps réel</b> — ' + esc(fMonth(m)) + ', ' + ts.length + ' tâche' + (ts.length > 1 ? 's' : '') + ' terminée' + (ts.length > 1 ? 's' : '') + '</div>'
       + rows.map(r => '<div class="fb-g"><span>' + esc(E.KIND_LABEL[r.k]) + ' <em class="small muted">(' + r.n + ')</em></span><span class="small muted">' + E.fmtMin(r.p) + ' → ' + E.fmtMin(r.a) + '</span><b class="' + (r.g > 10 ? 'bad' : r.g < -10 ? 'good' : '') + '">' + (r.g > 0 ? '+' : '') + r.g + ' %</b></div>').join('') + '</div>';
   }
+
+  /* ---------- V26.208 — Horaires de la semaine (contrats 39 h / 35 h, ou horaires propres) ---------- */
+  const DAYS_2 = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'];
+  function weekLabel(c) {
+    const w = E.weekHours(c, cfg()), wd = (c.work_days && c.work_days.length ? c.work_days : [1, 2, 3, 4, 5]).filter(d => d <= 5);
+    const tot = wd.reduce((s, d) => s + w[d - 1], 0), parts = [];
+    wd.forEach(d => { const last = parts[parts.length - 1]; if (last && last.v === w[d - 1] && last.b === d - 1) last.b = d; else parts.push({ a: d, b: d, v: w[d - 1] }); });
+    const days = p => DAYS_2[p.a - 1].toLowerCase() + (p.b > p.a ? '–' + DAYS_2[p.b - 1].toLowerCase() : '');
+    return (parts.length === 1 ? E.fmtMin(parts[0].v) + ' par jour' : parts.map(p => E.fmtMin(p.v) + ' ' + days(p)).join(' · ')) + ' — ' + E.fmtMin(tot) + ' / semaine';
+  }
+  const ownHours = c => { const h = (cfg().hours_by || {})[c.id]; return Array.isArray(h) && h.length === 5; };
+  function hoursField(c, isNew) {
+    const st = cfg();
+    if (!st.contract_hours && !(!isNew && ownHours(c))) return '<label class="f"><span>Heures disponibles par jour</span><input type="text" data-ch="co-field" data-k="daily_capacity_min" value="' + E.fmtMin(c.daily_capacity_min) + '"></label>';
+    const ct = c.kind === 'apprenti' ? 'Contrat 35 h : 7 h par jour' : 'Contrat 39 h : 8 h du lundi au jeudi, 7 h le vendredi';
+    if (isNew || !(isManager() || isAdmin())) return '<div class="f"><span>Horaires</span><div class="small" style="padding:8px 0">' + esc(isNew ? ct : weekLabel(c)) + '</div></div>';
+    const w = E.weekHours(c, st), own = ownHours(c);
+    return '<div class="f co-hours"><span>Horaires de la semaine</span><div class="co-h-row">' + DAYS_2.map((d, i) => '<label><em>' + d + '</em><input type="text" data-ch="co-hours" data-d="' + i + '" value="' + (w[i] ? E.fmtMin(w[i]) : '0') + '"' + (S.readonly ? ' disabled' : '') + '></label>').join('') + '</div>'
+      + '<em class="small muted">' + esc(own ? 'Horaires propres à ' + c.name + ' · ' + weekLabel(c) : ct) + (own && !S.readonly ? ' · <button class="lnk" data-act="co-hours-reset">revenir au contrat</button>' : '') + '</em></div>';
+  }
+  async function setHours(c, arr, text) {
+    const st = cfg(), by = Object.assign({}, st.hours_by || {}), def = (c.kind === 'apprenti' ? E.CONTRACT.apprenti : E.CONTRACT.full);
+    if (!arr || (st.contract_hours && arr.every((v, i) => v === def[i]))) delete by[c.id]; else by[c.id] = arr;
+    if (await savePlanning({ hours_by: by }, c.name + ' : ' + text)) { renderSheet(); render(); toast('Horaires de ' + c.name + ' : ' + weekLabel(c) + '. « Replanifier le mois » les applique aux dossiers déjà placés.', 'ok', null, 5000); }
+  }
   /* ---------- Vue TABLEAU DE BORD ---------- */
   /* ====================== V26.45 : synthèse hebdomadaire du manager (règles, sans IA générative) ======================
    * Phrases construites à partir des données : avancement, réceptions, échéances, surcharges prévues, marges, aide, absences. */
@@ -3856,7 +3882,7 @@
         if (E.hasAlloc(t)) {
           const sum = Object.values(t.alloc).reduce((s, v) => s + (Number(v) || 0), 0);
           if (sum !== dur) note('Répartition sur plusieurs jours incohérente', nm + ' (' + E.fmtMin(sum) + ' au lieu de ' + E.fmtMin(dur) + ')');
-          if (co && dur <= (Number(co.daily_capacity_min) || 0) && segs.length > 2 && !t.locked) note('Dossier coupé en plus de 2 parties', nm);
+          if (co && dur <= Math.max(...E.weekHours(co, cfg())) && segs.length > 2 && !t.locked) note('Dossier coupé en plus de 2 parties', nm);
         }
         if (!t.done && t.due_date && !E.isWorkday(t.due_date)) note('Échéance un week-end ou un jour férié', nm + ' (' + fDM(t.due_date) + ')');
       });
@@ -3906,7 +3932,7 @@
       + '<div><div class="small muted" style="margin-bottom:8px"><b style="color:var(--text)">Menu latéral (thème Clair)</b> — menu de gauche clair, sombre, ou coloré à la couleur choisie ci-dessus.</div><div class="seg">' + [['clair', 'Clair'], ['dark', 'Sombre'], ['color', 'Coloré']].map(o => '<button class="' + ((lsGet('planif-side') || 'clair') === o[0] ? 'on' : '') + '" data-act="side-mode" data-m="' + o[0] + '">' + o[1] + '</button>').join('') + '</div></div></div></div>';
     const cs = collabs(true).filter(c => isAdmin() || canSeeCollab(c.id));
     const collabCard = '<div class="card"><div class="card-h"><h2>Collaborateurs</h2>' + (isAdmin() ? '<button class="btn primary" data-act="collab-new">+ Collaborateur</button>' : '<span class="small muted">Congés et absences de ton équipe</span>') + '</div>'
-      + (cs.length ? '<table class="t stack"><thead><tr><th>Nom</th><th>Type</th><th>Capacité / jour</th><th>Jours travaillés</th><th>Absences à venir</th><th>Statut</th></tr></thead><tbody>' + cs.map(c => { const ab = list('absences').filter(a => a.collaborator_id === c.id && (a.date_to || a.date_from) >= today()); return '<tr class="click" data-act="collab-edit" data-id="' + c.id + '"><td class="first"><i class="swatch" style="background:' + esc(c.color || '#888') + '"></i> ' + esc(c.name) + '</td><td data-l="Type">' + collabKind(c) + '</td><td data-l="Capacité">' + E.fmtMin(c.daily_capacity_min) + '</td><td data-l="Jours">' + (c.work_days || []).sort().map(d => WD_LETTERS[d - 1]).join(' ') + '</td><td data-l="Absences">' + ab.length + '</td><td data-l="Statut">' + (c.active === false ? '<span class="badge">Inactif</span>' : '<span class="badge g">Actif</span>') + '</td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">Aucun collaborateur. Commencez ici.</div>') + '</div>';
+      + (cs.length ? '<table class="t stack"><thead><tr><th>Nom</th><th>Type</th><th>Capacité / jour</th><th>Jours travaillés</th><th>Absences à venir</th><th>Statut</th></tr></thead><tbody>' + cs.map(c => { const ab = list('absences').filter(a => a.collaborator_id === c.id && (a.date_to || a.date_from) >= today()); return '<tr class="click" data-act="collab-edit" data-id="' + c.id + '"><td class="first"><i class="swatch" style="background:' + esc(c.color || '#888') + '"></i> ' + esc(c.name) + '</td><td data-l="Type">' + collabKind(c) + '</td><td data-l="Capacité">' + weekLabel(c) + '</td><td data-l="Jours">' + (c.work_days || []).sort().map(d => WD_LETTERS[d - 1]).join(' ') + '</td><td data-l="Absences">' + ab.length + '</td><td data-l="Statut">' + (c.active === false ? '<span class="badge">Inactif</span>' : '<span class="badge g">Actif</span>') + '</td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">Aucun collaborateur. Commencez ici.</div>') + '</div>';
     if (!isAdmin()) return appearance + (isManager() ? '<div class="card"><h2 style="margin-bottom:12px">Début d\'utilisation</h2>' + startBlock() + '</div>' + collabCard : myAbsenceCard()); // V26.169 : le manager peut aussi revenir sur le mois de début
     return migNotice() + (isAdmin() ? diagCard() : '') + appearance + collabCard + teamsCard() + securityCard()
       + '<div class="card"><div class="card-h"><h2>Utilisateurs (' + users.filter(u => u.active).length + ' actifs)</h2><button class="btn primary" data-act="user-new">+ Utilisateur</button></div>'
@@ -3921,9 +3947,9 @@
       + num('warn_pct', 'Seuil « presque atteint » (%)', st.warn_pct, 50, 100) + num('due_soon_days', 'Échéance proche (jours)', st.due_soon_days, 0, 15) + num('new_margin_pct', 'Marge nouveau dossier, 3 premiers mois (%)', st.new_margin_pct, 0, 100)
       + '<label class="f"><span>Mois des dossiers trimestriels</span><input type="text" data-ch="setting" data-k="quarter_months" value="' + esc((st.quarter_months || []).join(', ')) + '"></label>'
       + num('annual_month', 'Mois des dossiers annuels', st.annual_month, 1, 12) + '</div><div class="row" style="margin-top:12px">'
-      + chk('holidays', 'Jours fériés = non travaillés', st.holidays) + chk('auto_lock_on_move', 'Verrouiller automatiquement une tâche déplacée à la main', st.auto_lock_on_move) + '</div>'
+      + chk('holidays', 'Jours fériés = non travaillés', st.holidays) + chk('contract_hours', 'Horaires des contrats : 39 h (8 h du lundi au jeudi, 7 h le vendredi) pour les RC et collaborateurs, 35 h (7 h par jour) pour les apprentis', st.contract_hours) + chk('auto_lock_on_move', 'Verrouiller automatiquement une tâche déplacée à la main', st.auto_lock_on_move) + '</div>'
       + '<div class="form" style="margin-top:14px"><label class="f"><span>Durée d\'une demande d\'informations (planning)</span><input type="text" data-ch="setting" data-k="info_request_min" value="' + E.fmtMin(st.info_request_min || 45) + '"></label>' + num('alert_from_day', 'Alerte « ne tiendra pas le ' + st.end_day + ' » à partir du', st.alert_from_day, 1, 28) + '</div><div class="row" style="margin-top:12px">' + chk('auto_create_month', 'Créer automatiquement les dossiers du mois en cours et du mois suivant (planning prospectif)', st.auto_create_month) + '</div>'
-      + '<div class="form" style="margin-top:14px">' + '<label class="f"><span>Temps réservé aux imprévus, par jour</span><input type="text" data-ch="setting" data-k="reserve_min" value="' + (Number(st.reserve_min) ? E.fmtMin(Number(st.reserve_min)) : '0') + '"></label></div><p class="small muted" style="margin:6px 0 0">Appels, mails, questions internes : ce temps n\'est jamais planifié (1 h conseillée, ex. 7h48 de contrat → 6h48 planifiables). Réglable aussi par personne, dans sa fiche. Jamais appliqué aux apprentis.</p>'
+      + '<div class="form" style="margin-top:14px">' + '<label class="f"><span>Temps réservé aux imprévus, par jour</span><input type="text" data-ch="setting" data-k="reserve_min" value="' + (Number(st.reserve_min) ? E.fmtMin(Number(st.reserve_min)) : '0') + '"></label></div><p class="small muted" style="margin:6px 0 0">Appels, mails, questions internes : ce temps n\'est jamais planifié (1 h conseillée, ex. 8 h de contrat → 7 h planifiables). Réglable aussi par personne, dans sa fiche. Jamais appliqué aux apprentis.</p>'
       + '<div class="form" style="margin-top:14px">' + num('freeze_days', 'Zone figée : aujourd\'hui + jours ouvrés', st.freeze_days, 0, 5) + '</div><p class="small muted" style="margin:6px 0 0">Dans la zone figée, un dossier reçu déjà planifié n\'est pas déplacé quand un autre dossier arrive (sauf « Forcer » lors d\'une replanification).</p>'
       + '<div class="row" style="margin-top:12px">' + chk('agent_enabled', 'Agent de planification : apprend des mois précédents et ajuste les dates de réception prévues', st.agent_enabled) + '</div></div>'
       + '<div class="card"><div class="card-h"><h2>Historique pour l\'agent</h2><span class="small muted">' + S.data.learning_history.size + ' ligne(s) importée(s)</span></div>'
@@ -4168,9 +4194,9 @@
     const abs = isNew ? [] : list('absences').filter(a => a.collaborator_id === c.id).sort((a, b) => b.date_from.localeCompare(a.date_from));
     return sheetHead(isNew ? 'Nouveau collaborateur' : esc(c.name))
       + '<div class="sheet-b">' + remoteNotice(s) + '<div class="form"><label class="f"><span>Nom</span><input type="text" data-ch="co-field" data-k="name" value="' + esc(c.name || '') + '"></label>'
-      + '<label class="f"><span>Heures disponibles par jour</span><input type="text" data-ch="co-field" data-k="daily_capacity_min" value="' + E.fmtMin(c.daily_capacity_min) + '"><em class="small muted">soit ' + E.fmtMin((Number(c.daily_capacity_min) || 0) * ((c.work_days || []).length || 5)) + ' par semaine (contrat ' + (c.kind === 'apprenti' ? '35 h : 7h' : '39 h : 7h48') + ' par jour)</em></label>'
+      + hoursField(c, isNew) // V26.208 : horaires de la semaine (contrats 39 h / 35 h)
       + (!isNew && (isManager() || isAdmin()) && c.kind !== 'apprenti' ? (() => { const by = cfg().reserve_min_by || {}, own = by[c.id] !== undefined && by[c.id] !== null && by[c.id] !== '', r = E.reserveOf(c, cfg()), cab = Number(cfg().reserve_min) || 0; // V26.207 : imprévus réservés à la personne, en minutes (jamais pour un apprenti)
-        return '<label class="f"><span>Temps réservé aux imprévus</span><select data-ch="co-reserve"' + (S.readonly ? ' disabled' : '') + '><option value=""' + (own ? '' : ' selected') + '>Comme le cabinet (' + (cab ? E.fmtMin(cab) : 'aucun') + ')</option>' + [0, 15, 30, 45, 60, 90, 120].map(v => '<option value="' + v + '"' + (own && Number(by[c.id]) === v ? ' selected' : '') + '>' + (v ? E.fmtMin(v) + ' par jour' : 'Aucun') + '</option>').join('') + '</select><em class="small muted">soit ' + E.fmtMin(Math.max(0, (Number(c.daily_capacity_min) || 0) - r)) + ' planifiables par jour</em></label>'; })() : '')
+        return '<label class="f"><span>Temps réservé aux imprévus</span><select data-ch="co-reserve"' + (S.readonly ? ' disabled' : '') + '><option value=""' + (own ? '' : ' selected') + '>Comme le cabinet (' + (cab ? E.fmtMin(cab) : 'aucun') + ')</option>' + [0, 15, 30, 45, 60, 90, 120].map(v => '<option value="' + v + '"' + (own && Number(by[c.id]) === v ? ' selected' : '') + '>' + (v ? E.fmtMin(v) + ' par jour' : 'Aucun') + '</option>').join('') + '</select><em class="small muted">' + (r ? 'soit ' + E.fmtMin(r) + ' de moins chaque jour pour le planning' : 'toute la journée est planifiable') + '</em></label>'; })() : '')
       + '<label class="f"><span>Couleur</span><input type="color" data-ch="co-field" data-k="color" value="' + esc(c.color || '#2f6fd0') + '" style="min-height:38px;width:100%"></label>'
       + (S.v8 ? '<label class="f"><span>Fonction</span><select data-ch="co-field" data-k="kind"' + (isAdmin() ? '' : ' disabled') + '><option value="collab"' + (c.kind !== 'rc' && c.kind !== 'apprenti' ? ' selected' : '') + '>Collaborateur comptable</option><option value="rc"' + (c.kind === 'rc' ? ' selected' : '') + '>Responsable client (RC)</option>' + (v17() ? '<option value="apprenti"' + (c.kind === 'apprenti' ? ' selected' : '') + '>Apprenti</option>' : '') + '</select></label>'
         + '<label class="f"><span>Équipe</span><select data-ch="co-field" data-k="team_id"' + (isAdmin() ? '' : ' disabled') + '><option value="">—</option>' + list('teams').sort(byName).map(tm => '<option value="' + tm.id + '"' + (tm.id === c.team_id ? ' selected' : '') + '>' + esc(tm.name) + '</option>').join('') + '</select></label>'
@@ -4470,8 +4496,8 @@
     let val; try { val = parseField(k, v); } catch (e) { toast(e.message, 'warn'); renderSheet(); return; }
     if (S.sheet && !S.sheet.id) {
       S.sheet.draft[k] = val;
-      // V26.207 : contrat 39 h (7h48 par jour) pour un RC ou un collaborateur, 35 h (7 h) pour un apprenti
-      if (k === 'kind' && [420, 468].includes(Number(S.sheet.draft.daily_capacity_min))) { S.sheet.draft.daily_capacity_min = val === 'apprenti' ? 420 : 468; renderSheet(); }
+      // V26.208 : la fiche suit le contrat (39 h : jusqu'à 8 h par jour pour un RC ou un collaborateur, 35 h : 7 h pour un apprenti)
+      if (k === 'kind' && [420, 468, 480].includes(Number(S.sheet.draft.daily_capacity_min))) { S.sheet.draft.daily_capacity_min = val === 'apprenti' ? 420 : 480; renderSheet(); }
       return;
     }
     await saveUpdate('collaborators', c.id, { [k]: val }, { history: { action: 'collaborateur', entity: 'collaborator', entity_id: c.id, detail: { text: c.name + ' : ' + k + ' modifié' } } });
@@ -4723,7 +4749,7 @@
       const nameMap = new Map(collabs(true).map(c => [norm(c.name), c.id]));
       if (isManager() && imp.createCollabs && imp.newCollabs.length) {
         const n0 = collabs(true).length;
-        const created = await saveInsert('collaborators', imp.newCollabs.map((n, i) => ({ id: P.uuid(), name: n, daily_capacity_min: 468, work_days: [1, 2, 3, 4, 5], color: COLORS[(n0 + i) % COLORS.length], active: true })));
+        const created = await saveInsert('collaborators', imp.newCollabs.map((n, i) => ({ id: P.uuid(), name: n, daily_capacity_min: 480, work_days: [1, 2, 3, 4, 5], color: COLORS[(n0 + i) % COLORS.length], active: true })));
         created.forEach(c => nameMap.set(norm(c.name), c.id));
       }
       const ok = imp.rows.filter(r => !r.errors.length);
@@ -5644,6 +5670,7 @@
     'done-group': (el, e) => { e.stopPropagation(); finishGroup(groupFromKey(el.dataset.key)); },
     'lock-group': el => lockGroup(groupFromKey(el.dataset.key)),
     'ir-list': el => openSheet({ type: 'irList', wide: true, ids: (el.dataset.ids || '').split(',').filter(Boolean) }), // V26.197
+    'co-hours-reset': () => { const c = S.sheet && S.data.collaborators.get(S.sheet.id); if (c) setHours(c, null, 'horaires du contrat'); },
     'wait-pick': el => { S.waitPick = el.dataset.pid; renderSheet(); }, // V26.206 : en attente du client
     'wait-set': el => { S.waitPick = null; setWait(el.dataset.pid, el.dataset.why).then(() => { if (S.sheet) renderSheet(); }); },
     'wait-end': el => endWait(el.dataset.pid).then(() => { if (S.sheet) renderSheet(); }),
@@ -5680,7 +5707,7 @@
     'client-new': () => openSheet({ type: 'client', draft: { name: '', collaborator_id: S.clientCollab || null, frequency: 'mensuel', reception_day: 5, time_min: 0, vat_due_day: 19, priority: 2, notes: '' } }),
     'client-create': () => createClient(),
     'client-del': async el => { const c = clientOf(el.dataset.id); if (c && await confirmBox('Supprimer le dossier ?', '<p>Le dossier <b>' + esc(c.name) + '</b> et toute sa production (tous les mois) seront supprimés définitivement. Pour simplement l\'arrêter, décochez plutôt « Dossier actif ».</p>', 'Supprimer', true)) { if (await saveRemove('clients', c.id)) { list('productions').filter(p => p.client_id === c.id).forEach(p => S.data.productions.delete(p.id)); list('tasks').filter(t => t.client_id === c.id).forEach(t => S.data.tasks.delete(t.id)); hist('dossier', { detail: { text: 'Suppression d\'un dossier' } }); closeSheet(); } } },
-    'collab-new': () => openSheet({ type: 'collab', draft: { name: '', daily_capacity_min: 468, work_days: [1, 2, 3, 4, 5], color: COLORS[collabs(true).length % COLORS.length], active: true } }),
+    'collab-new': () => openSheet({ type: 'collab', draft: { name: '', daily_capacity_min: 480, work_days: [1, 2, 3, 4, 5], color: COLORS[collabs(true).length % COLORS.length], active: true } }),
     'collab-edit': el => openSheet({ type: 'collab', id: el.dataset.id }),
     'collab-create': async () => {
       const d = S.sheet.draft;
@@ -5790,6 +5817,13 @@
       if (!s.id) { s.draft.start = el.value; return; }
       const u = S.data.app_users.get(s.id); if (!u) return;
       if (await setUserStart(u.email, el.value)) toast('Début d\'utilisation de ' + u.name + ' : ' + (el.value ? fMonth(el.value) : 'comme le cabinet') + '.', 'ok', null, 3000);
+    },
+    'co-hours': el => { // V26.208 : horaires d'un jour de la semaine
+      const s = S.sheet, c = s && S.data.collaborators.get(s.id); if (!c) return;
+      const z = String(el.value).trim(), v = z === '' || /^0+$/.test(z) ? 0 : E.parseDuration(z);
+      if (isNaN(v) || v < 0 || v > 720) { toast('Durée illisible (ex. 8h, 7h30, 0).', 'warn'); renderSheet(); return; }
+      const arr = E.weekHours(c, cfg()); arr[Number(el.dataset.d)] = v;
+      setHours(c, arr, 'horaires du ' + ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi'][Number(el.dataset.d)] + ' = ' + E.fmtMin(v));
     },
     'co-reserve': async el => { // V26.206 : réserve pour imprévus d'une personne (vide = comme le cabinet)
       const s = S.sheet, c = s && S.data.collaborators.get(s.id); if (!c) return;

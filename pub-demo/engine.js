@@ -186,7 +186,7 @@
     if (!wd.includes(dow(date))) return 0;
     if (ctx.settings.holidays && holidayName(date)) return 0;
     if (collab.kind === 'apprenti' && !presenceSet(collab).has(date)) return 0; // apprenti : uniquement ses jours en entreprise
-    let cap = Number(collab.daily_capacity_min) || 0;
+    let cap = baseOn(collab, date, ctx.settings);
     for (const a of ctx.absByCollab.get(collab.id) || []) {
       if (a.date_from <= date && date <= (a.date_to || a.date_from)) {
         if (a.minutes === null || a.minutes === undefined || a.minutes === '') return 0;
@@ -202,7 +202,18 @@
     const st = settings || {}, by = st.reserve_min_by || {}, v = by[collab.id] !== undefined && by[collab.id] !== null && by[collab.id] !== '' ? by[collab.id] : st.reserve_min;
     return Math.min(240, Math.max(0, Math.round(Number(v) || 0)));
   }
-  const prodDayCap = (collab, settings) => Math.max(0, (Number(collab && collab.daily_capacity_min) || 0) - reserveOf(collab, settings));
+  const prodDayCap = (collab, settings) => Math.max(0, (collab ? Math.max(...weekHours(collab, settings)) : 0) - reserveOf(collab, settings));
+  /* V26.208 — Horaires de la semaine (lundi → vendredi, en minutes) :
+   * horaires propres à la personne (hours_by), sinon contrat (contract_hours) : 39 h = 8 h du lundi au jeudi + 7 h le vendredi
+   * (RC, collaborateurs), 35 h = 7 h par jour (apprentis) ; sinon la capacité par jour de la fiche. */
+  const CONTRACT = { full: [480, 480, 480, 480, 420], apprenti: [420, 420, 420, 420, 420] };
+  function weekHours(collab, settings) {
+    const st = settings || {}, own = collab && (st.hours_by || {})[collab.id];
+    if (Array.isArray(own) && own.length === 5) return own.map(n => Math.max(0, Math.round(Number(n) || 0)));
+    if (st.contract_hours && collab) return (collab.kind === 'apprenti' ? CONTRACT.apprenti : CONTRACT.full).slice();
+    const d = Number(collab && collab.daily_capacity_min) || 0; return [d, d, d, d, d];
+  }
+  function baseOn(collab, date, settings) { const w = dow(date); return w <= 5 ? weekHours(collab, settings)[w - 1] : 0; }
   /* V26.206 — Dossier « en attente du client » : retiré du planning jusqu'à la réponse */
   const onHold = p => !!(p && p.filing && p.filing.wait);
   function absenceOn(collabId, date, ctx) {
@@ -907,7 +918,7 @@
       if (wd < 2) continue; // pièces trop tardives : ce n'est pas un problème de charge
       let best = null;
       for (const c of cands) {
-        if (c.id === t.collaborator_id || dur > (Number(c.daily_capacity_min) || 0) * 2) continue;
+        if (c.id === t.collaborator_id || dur > Math.max(...weekHours(c, st)) * 2) continue;
         for (let d = ready; d <= lim; d = addDays(d, 1)) {
           const f1 = free(c, d); if (!f1) continue;
           if (f1 >= dur) { best = pickBest(best, { c, date: d, alloc: null, f: f1 }); break; }
@@ -933,7 +944,7 @@
     pad, ymd, parseYmd, addDays, dow, daysInMonth, dateInMonth, addMonths, monthDates, rangeDates, startOfWeek, daysBetween, windowOf,
     easter, holidays, holidayName,
     fmtMin, fmtClock, parseClock, parseDuration, parseDay, parsePriority, parseFrequency,
-    makeCtx, capacityOn, reserveOf, onHold, absenceOn, clientApplies, buildMonth, plan, clientTime, productionTask, projection, suggestTransfers, hasAlloc, segs, minutesOn, endDate, onDay, spread, loadOf, levelOf, productionStatus, alerts, dashboard,
+    makeCtx, capacityOn, reserveOf, weekHours, CONTRACT, onHold, absenceOn, clientApplies, buildMonth, plan, clientTime, productionTask, projection, suggestTransfers, hasAlloc, segs, minutesOn, endDate, onDay, spread, loadOf, levelOf, productionStatus, alerts, dashboard,
     isReceived, freezeEnd, learn, predictReception, capacityRisk, rebalance, monthsBetween, isWorkday, nextWorkday, dashboardFor, buildDashboards, milestones
   };
 })(typeof window !== 'undefined' ? window : globalThis);

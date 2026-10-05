@@ -134,3 +134,28 @@
     return '<div class="fb-gap"><div class="small muted" style="margin:12px 0 6px"><b style="color:var(--text)">Temps prévu / temps réel</b> — ' + esc(fMonth(m)) + ', ' + ts.length + ' tâche' + (ts.length > 1 ? 's' : '') + ' terminée' + (ts.length > 1 ? 's' : '') + '</div>'
       + rows.map(r => '<div class="fb-g"><span>' + esc(E.KIND_LABEL[r.k]) + ' <em class="small muted">(' + r.n + ')</em></span><span class="small muted">' + E.fmtMin(r.p) + ' → ' + E.fmtMin(r.a) + '</span><b class="' + (r.g > 10 ? 'bad' : r.g < -10 ? 'good' : '') + '">' + (r.g > 0 ? '+' : '') + r.g + ' %</b></div>').join('') + '</div>';
   }
+
+  /* ---------- V26.208 — Horaires de la semaine (contrats 39 h / 35 h, ou horaires propres) ---------- */
+  const DAYS_2 = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'];
+  function weekLabel(c) {
+    const w = E.weekHours(c, cfg()), wd = (c.work_days && c.work_days.length ? c.work_days : [1, 2, 3, 4, 5]).filter(d => d <= 5);
+    const tot = wd.reduce((s, d) => s + w[d - 1], 0), parts = [];
+    wd.forEach(d => { const last = parts[parts.length - 1]; if (last && last.v === w[d - 1] && last.b === d - 1) last.b = d; else parts.push({ a: d, b: d, v: w[d - 1] }); });
+    const days = p => DAYS_2[p.a - 1].toLowerCase() + (p.b > p.a ? '–' + DAYS_2[p.b - 1].toLowerCase() : '');
+    return (parts.length === 1 ? E.fmtMin(parts[0].v) + ' par jour' : parts.map(p => E.fmtMin(p.v) + ' ' + days(p)).join(' · ')) + ' — ' + E.fmtMin(tot) + ' / semaine';
+  }
+  const ownHours = c => { const h = (cfg().hours_by || {})[c.id]; return Array.isArray(h) && h.length === 5; };
+  function hoursField(c, isNew) {
+    const st = cfg();
+    if (!st.contract_hours && !(!isNew && ownHours(c))) return '<label class="f"><span>Heures disponibles par jour</span><input type="text" data-ch="co-field" data-k="daily_capacity_min" value="' + E.fmtMin(c.daily_capacity_min) + '"></label>';
+    const ct = c.kind === 'apprenti' ? 'Contrat 35 h : 7 h par jour' : 'Contrat 39 h : 8 h du lundi au jeudi, 7 h le vendredi';
+    if (isNew || !(isManager() || isAdmin())) return '<div class="f"><span>Horaires</span><div class="small" style="padding:8px 0">' + esc(isNew ? ct : weekLabel(c)) + '</div></div>';
+    const w = E.weekHours(c, st), own = ownHours(c);
+    return '<div class="f co-hours"><span>Horaires de la semaine</span><div class="co-h-row">' + DAYS_2.map((d, i) => '<label><em>' + d + '</em><input type="text" data-ch="co-hours" data-d="' + i + '" value="' + (w[i] ? E.fmtMin(w[i]) : '0') + '"' + (S.readonly ? ' disabled' : '') + '></label>').join('') + '</div>'
+      + '<em class="small muted">' + esc(own ? 'Horaires propres à ' + c.name + ' · ' + weekLabel(c) : ct) + (own && !S.readonly ? ' · <button class="lnk" data-act="co-hours-reset">revenir au contrat</button>' : '') + '</em></div>';
+  }
+  async function setHours(c, arr, text) {
+    const st = cfg(), by = Object.assign({}, st.hours_by || {}), def = (c.kind === 'apprenti' ? E.CONTRACT.apprenti : E.CONTRACT.full);
+    if (!arr || (st.contract_hours && arr.every((v, i) => v === def[i]))) delete by[c.id]; else by[c.id] = arr;
+    if (await savePlanning({ hours_by: by }, c.name + ' : ' + text)) { renderSheet(); render(); toast('Horaires de ' + c.name + ' : ' + weekLabel(c) + '. « Replanifier le mois » les applique aux dossiers déjà placés.', 'ok', null, 5000); }
+  }

@@ -60,6 +60,7 @@
     'done-group': (el, e) => { e.stopPropagation(); finishGroup(groupFromKey(el.dataset.key)); },
     'lock-group': el => lockGroup(groupFromKey(el.dataset.key)),
     'ir-list': el => openSheet({ type: 'irList', wide: true, ids: (el.dataset.ids || '').split(',').filter(Boolean) }), // V26.197
+    'co-hours-reset': () => { const c = S.sheet && S.data.collaborators.get(S.sheet.id); if (c) setHours(c, null, 'horaires du contrat'); },
     'wait-pick': el => { S.waitPick = el.dataset.pid; renderSheet(); }, // V26.206 : en attente du client
     'wait-set': el => { S.waitPick = null; setWait(el.dataset.pid, el.dataset.why).then(() => { if (S.sheet) renderSheet(); }); },
     'wait-end': el => endWait(el.dataset.pid).then(() => { if (S.sheet) renderSheet(); }),
@@ -96,7 +97,7 @@
     'client-new': () => openSheet({ type: 'client', draft: { name: '', collaborator_id: S.clientCollab || null, frequency: 'mensuel', reception_day: 5, time_min: 0, vat_due_day: 19, priority: 2, notes: '' } }),
     'client-create': () => createClient(),
     'client-del': async el => { const c = clientOf(el.dataset.id); if (c && await confirmBox('Supprimer le dossier ?', '<p>Le dossier <b>' + esc(c.name) + '</b> et toute sa production (tous les mois) seront supprimés définitivement. Pour simplement l\'arrêter, décochez plutôt « Dossier actif ».</p>', 'Supprimer', true)) { if (await saveRemove('clients', c.id)) { list('productions').filter(p => p.client_id === c.id).forEach(p => S.data.productions.delete(p.id)); list('tasks').filter(t => t.client_id === c.id).forEach(t => S.data.tasks.delete(t.id)); hist('dossier', { detail: { text: 'Suppression d\'un dossier' } }); closeSheet(); } } },
-    'collab-new': () => openSheet({ type: 'collab', draft: { name: '', daily_capacity_min: 468, work_days: [1, 2, 3, 4, 5], color: COLORS[collabs(true).length % COLORS.length], active: true } }),
+    'collab-new': () => openSheet({ type: 'collab', draft: { name: '', daily_capacity_min: 480, work_days: [1, 2, 3, 4, 5], color: COLORS[collabs(true).length % COLORS.length], active: true } }),
     'collab-edit': el => openSheet({ type: 'collab', id: el.dataset.id }),
     'collab-create': async () => {
       const d = S.sheet.draft;
@@ -206,6 +207,13 @@
       if (!s.id) { s.draft.start = el.value; return; }
       const u = S.data.app_users.get(s.id); if (!u) return;
       if (await setUserStart(u.email, el.value)) toast('Début d\'utilisation de ' + u.name + ' : ' + (el.value ? fMonth(el.value) : 'comme le cabinet') + '.', 'ok', null, 3000);
+    },
+    'co-hours': el => { // V26.208 : horaires d'un jour de la semaine
+      const s = S.sheet, c = s && S.data.collaborators.get(s.id); if (!c) return;
+      const z = String(el.value).trim(), v = z === '' || /^0+$/.test(z) ? 0 : E.parseDuration(z);
+      if (isNaN(v) || v < 0 || v > 720) { toast('Durée illisible (ex. 8h, 7h30, 0).', 'warn'); renderSheet(); return; }
+      const arr = E.weekHours(c, cfg()); arr[Number(el.dataset.d)] = v;
+      setHours(c, arr, 'horaires du ' + ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi'][Number(el.dataset.d)] + ' = ' + E.fmtMin(v));
     },
     'co-reserve': async el => { // V26.206 : réserve pour imprévus d'une personne (vide = comme le cabinet)
       const s = S.sheet, c = s && S.data.collaborators.get(s.id); if (!c) return;

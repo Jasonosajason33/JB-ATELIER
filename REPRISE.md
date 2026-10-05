@@ -1,4 +1,4 @@
-# JB Flow — fichier de reprise (état au 3 octobre 2026, version 26.207)
+# JB Flow — fichier de reprise (état au 3 octobre 2026, version 26.208)
 
 Coller ce fichier au début d'une nouvelle session Claude (cloud ou locale) pour reprendre le travail sans perte.
 Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraison, vocabulaire, module Révision, film).
@@ -7,7 +7,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - Application statique `app/` mise en ligne sur Cloudflare (https://jbflow.app-flow.workers.dev) depuis le dépôt GitHub « JB-FLOW-AUTOMATIC » (commande de build : `node build.js`). Base de données Supabase.
 - Sources : `src/app/NN-*.js`, assemblées dans `app/app.js` par `build.ps1` (PC sans Node) ou `build.js`.
 - Démo publiée (données fictives) : https://claude.ai/artifact/PaW1TkQGP4JfcWnmWqchyj — page `pub-demo/jbflow-demo.html`.
-- Tests du moteur : `app/tests/moteur.html` (7 tests, tous verts en 26.207).
+- Tests du moteur : `app/tests/moteur.html` (7 tests, tous verts en 26.208).
 - Dépôt de travail : GitHub « JB-ATELIER » (branche `claude/new-session-hylho7`) contient `app/`, `src/`, `supabase/`, `pub-demo/` et `sim/preview-cards.css`. Le dépôt « JB-FLOW-AUTOMATIC » (mis en ligne par Cloudflare) était resté en 26.45 au 3 octobre.
 - Outils de test automatisés (Edge sans fenêtre) : `sim/build-steps.ps1` + `sim/cdp-steps.ps1` ; aides `sim/crypto-helpers.js`.
 
@@ -22,7 +22,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - Aperçu « cartes de tâches fines + coche minimaliste » : visible seulement dans la démo (`sim/preview-cards.css`, ajouté à `pub-demo/design-effects.css` à chaque copie) — à valider avant intégration.
 - Après déploiement de la 26.181 et plus : ouvrir l'application avec le compte administrateur, dans sa propre vue, pour nettoyer automatiquement les doublons de tableaux de bord déjà enregistrés.
 
-## Dernières versions (26.176 → 26.207)
+## Dernières versions (26.176 → 26.208)
 - 26.176 : système d'animation commun aux 4 thèmes (`app/design-motion.css`, `src/app/021-mouvement.js` : FAST 140 / MEDIUM 200 / SLOW 280 ms, courbe cubic-bezier(.22, 1, .36, 1)).
 - 26.177 → 26.180 : cartes affinées (TVA, alertes, IS / CFE / CVAE, réceptions ajustées, historique, Dashboard Clients, fenêtre du Suivi TVA) ; effet de clic « ripple » (380 ms) ; doublons de tableaux de bord corrigés.
 - 26.181 : audit — plus aucune action ne gonfle un planning (temps d'un dossier scindé, demandes d'informations, réception partielle, génération du mois, création / import de dossiers).
@@ -52,6 +52,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - 26.205 : la ligne « À affecter » (Jour et Semaine) est toujours affichée et reçoit les tâches : une tâche planifiée qu'on y dépose perd sa date et est déverrouillée (`pcUnplan`, `data-drop="unpl"`). Attention : une replanification du mois peut la replacer.
 - 26.206 : fiabilité du planning. (1) Réserve pour imprévus : `reserve_pct` (20 % par défaut, défini dans `cfg()`, absent des défauts du moteur) et `reserve_by` par personne (fiche collaborateur) — `E.capacityOn` renvoie la capacité planifiable (`raw` = capacité totale), zone hachurée « Imprévus » en fin de journée (vue Jour). (2) « En attente du client » : `productions.filing.wait = {since, why, by}` (sans migration), tâches retirées du planning et ignorées par `plan()` / `rebalance()` (`E.onHold`), relances J+3 / J+7 puis « À signaler au manager » à J+10, « Réponse reçue — reprendre » replanifie (historique `attente` / `attente_fin`). (3) Cause du retard demandée à la clôture d'une tâche en retard (historique `terminee`, `detail.cause`). Pilotage › Vue d'ensemble : section « Fiabilité du planning » (attente client, délai moyen de réponse, Pareto des causes, temps prévu / réel). Fichier `src/app/072-attente-causes.js`.
 - 26.207 : imprévus en minutes et non plus en % : `reserve_min` (1 h par jour par défaut dans `cfg()`), `reserve_min_by` {id: minutes} par personne ; jamais de réserve pour un apprenti (`E.reserveOf`). Contrats : 39 h (7h48 par jour) pour RC et collaborateurs, 35 h (7 h) pour les apprentis — défaut des nouvelles fiches et de l'import, rappel « soit … par semaine » dans la fiche. Planning nettoyé : indicateur « Terminé » remplacé par « En attente client » (relances à faire en sous-titre), carte « Synthèse » retirée, « En retard » / « Éléments attendus » / attente client retirés de « À surveiller » (déjà en haut) ; 3 cartes.
+- 26.208 : horaires de la semaine. `contract_hours` (activé par défaut dans `cfg()`, case dans Paramètres › Planification) : 39 h = 8 h du lundi au jeudi + 7 h le vendredi pour RC et collaborateurs, 35 h = 7 h par jour pour les apprentis, appliqué à toutes les fiches existantes sans migration (`E.weekHours`, `E.CONTRACT`). Horaires propres à une personne : `hours_by` {id: [lun…ven en minutes]} (fiche collaborateur, 5 cases, « revenir au contrat »). `daily_capacity_min` ne sert plus que si `contract_hours` est désactivé. Tableau de l'équipe : « 8h lun–jeu · 7h ven — 39h / semaine ».
 
 ## Film de présentation (v3 du 1er octobre 2026 — à reprendre plus tard)
 - But : présenter JB Flow aux supérieurs. Lien : https://claude.ai/artifact/J1CXu3csSo28ST8YGcrTpH (v3 publiée).

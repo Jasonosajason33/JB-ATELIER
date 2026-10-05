@@ -37,7 +37,8 @@
   // V26.202 : exception accordée par l'administrateur (Paramètres › Utilisateurs) — la personne peut modifier tous les champs des fiches des dossiers qu'elle voit
   const clientEditor = () => !!S.me && !S.readonly && (planVal().client_editors || []).map(x => String(x).toLowerCase()).includes(String(S.me.email || '').toLowerCase());
   // V26.207 : 1 h par jour gardée pour les imprévus, par défaut (Paramètres › Planification, et par personne ; jamais pour un apprenti)
-  const cfg = () => Object.assign({}, E.DEFAULT_SETTINGS, { reserve_min: 60 }, ((S.data.settings.get('planning') || {}).value) || {});
+  const cfg = () => Object.assign({}, E.DEFAULT_SETTINGS, { reserve_min: 60, contract_hours: true }, // V26.208 : horaires des contrats (39 h / 35 h)
+      ((S.data.settings.get('planning') || {}).value) || {});
   // V26.73 : un administrateur peut prévisualiser l'application « comme un manager » (affichage uniquement)
   const realAdmin = () => !!((S.realMe || S.me) && (S.realMe || S.me).role === 'admin'); // V26.144 : S.realMe = l'administrateur quand il regarde l'application « en tant que » quelqu'un
   const meName = () => ((S.realMe || S.me) || {}).name || '';

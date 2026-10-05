@@ -109,7 +109,7 @@
       const nameMap = new Map(collabs(true).map(c => [norm(c.name), c.id]));
       if (isManager() && imp.createCollabs && imp.newCollabs.length) {
         const n0 = collabs(true).length;
-        const created = await saveInsert('collaborators', imp.newCollabs.map((n, i) => ({ id: P.uuid(), name: n, daily_capacity_min: 468, work_days: [1, 2, 3, 4, 5], color: COLORS[(n0 + i) % COLORS.length], active: true })));
+        const created = await saveInsert('collaborators', imp.newCollabs.map((n, i) => ({ id: P.uuid(), name: n, daily_capacity_min: 480, work_days: [1, 2, 3, 4, 5], color: COLORS[(n0 + i) % COLORS.length], active: true })));
         created.forEach(c => nameMap.set(norm(c.name), c.id));
       }
       const ok = imp.rows.filter(r => !r.errors.length);
