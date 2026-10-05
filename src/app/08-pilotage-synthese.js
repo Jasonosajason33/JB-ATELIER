@@ -75,6 +75,7 @@
   }
   function vDashboard() {    const m = S.month, td = today(), x = ctx(), db = E.dashboard(scopedData(), m, td), al = alertsOf(scopedData(), td, { month: m });
     const Pr = db.productions, L = db.load, tot = Pr.total || 1, tasks = list('tasks');
+    db.unplanned = db.unplanned.filter(t => t.kind === 'info' || !waitOf(S.data.productions.get(t.production_id))); // V26.206 : l'attente client n'est pas un manque de place
     const pct = (a, b) => (b ? Math.round(a / b * 100) : 0);
     const sparks = dashSparks(m);
     const kp = (i, icon, box, label, val, fmt, key, foot, extra) => '<div class="kpi anim-in' + (extra || '') + (key.indexOf('dp-') === 0 ? ' kpi-click' : '') + '" style="--i:' + i + '"' + (key.indexOf('dp-') === 0 ? ' data-act="prod-detail" data-k="' + key + '" role="button" tabindex="0"' : '') + '><div class="kpi-h"><span class="ibox ' + box + '">' + ic(icon, 'sm') + '</span>' + label + '</div><div class="v" data-count="' + val + '" data-fmt="' + fmt + '" data-key="' + key + m + '">' + fmtVal(val, fmt) + '</div><div class="foot">' + foot + '</div>' + (sparks[key] || '') + '</div>';
@@ -123,7 +124,7 @@
       + capSection() + riskSection(m) + helpSection() + postponeSection() + '<div class="split" style="margin-top:var(--gap)">'
       + (db.unplanned.length ? '<div class="frame anim-in"><div class="frame-h">' + ic('alert') + '<h2>Tâches non planifiées</h2><span class="badge r">' + db.unplanned.length + '</span></div><div class="inner"><div class="tasks">' + db.unplanned.slice(0, 20).map(t => taskRow(t, { showCollab: true, swipe: false })).join('') + '</div></div></div>' : '<div class="frame anim-in"><div class="frame-h">' + ic('check') + '<h2>Planification</h2></div><div class="inner"><div class="empty">Toutes les tâches du mois sont planifiées.</div></div></div>')
       + '<div class="frame anim-in"><div class="frame-h">' + ic('alert') + '<h2>Alertes</h2><span class="badge' + (al.some(a => a.level === 'bad') ? ' r' : '') + '">' + al.length + '</span></div><div class="inner">' + alertList(al, 12) + '</div></div>'
-      + '</div>' : '')
+      + '</div>' + fiabSection(m) : '')
       + (act ? '<div class="section-t"><h2>Niveau d\'activité</h2><span class="legend d-only"><span><i class="lg-sw hatch"></i>Jours passés</span><span><i class="lg-sw" style="background:var(--pop)"></i>Aujourd\'hui</span><span><i class="lg-sw vb-fut"></i>À venir</span><span><i class="lg-sw" style="background:var(--bad)"></i>Surcharge</span><span><i class="lg-sw" style="background:var(--track)"></i>Capacité</span></span></div>'
       + '<div class="split">'
       + '<div class="card anim-in" style="--i:5"><div class="card-h"><h2>Niveau d\'activité de l\'équipe par jour</h2><span class="badge">' + E.fmtMin(L.total) + ' planifiées</span></div><div class="vbars">' + (bars || '<div class="empty" style="width:100%">Les dossiers du mois ne sont pas encore créés.</div>') + '</div></div>'

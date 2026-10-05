@@ -331,7 +331,7 @@
     if (t.part === 'reste' && forecast) meta.push('<span class="badge">Reste attendu</span>');
     if (forecast) meta.push('<span class="badge"' + predictTitle(p) + '>' + ic('calendar') + (isManager() ? 'Prévu · attendus le ' + Number((p.expected_date || '').slice(8)) + expHint(p) : 'Éléments attendus vers le ' + Number((p.expected_date || '').slice(8)) + ' · rien à faire pour l\'instant') + '</span>' + (S.readonly ? '' : '<button class="badge b act" data-act="rec-one" data-id="' + p.id + '" title="Déclarer les éléments reçus aujourd\'hui">' + ic('inbox') + 'Reçu</button>' + (S.v7 ? '<button class="badge act" data-act="rec-part" data-id="' + p.id + '" title="Une partie seulement des éléments est arrivée">Partiel</button>' : '')));
     if (t.kind === 'production' || E.KINDS.indexOf(t.kind) < 3) E.obligations(c, t.month, cfg()).filter(o => o.code !== 'CA3').forEach(o => meta.push('<span class="badge b">' + o.label + ' · ' + fDM(o.due) + '</span>'));
-    if (t.kind !== 'info' && p && p.info_request === 'a_faire') meta.push('<span class="badge o">' + ic('mail') + 'Demande à faire</span>');
+    if (t.kind !== 'info' && p && p.info_request === 'a_faire') meta.push('<span class="badge o">' + ic('mail') + 'Demande à faire</span>'); if (t.kind !== 'info' && waitOf(p)) meta.push(waitBadge(p)); // V26.206
     if (t.locked) meta.push(canEditTask(t) && !S.readonly ? '<button class="badge k lock-btn" data-act="lock" data-id="' + t.id + '" title="Cliquer pour déverrouiller">' + ic('lock') + 'Verrouillée<span class="lock-x">· déverrouiller</span></button>' : '<span class="badge k">' + ic('lock') + 'Verrouillée</span>'); // V26.143 : déverrouiller d'un clic
     if (late) meta.push('<span class="badge o">À reprendre</span>');
     if (after) meta.push('<span class="badge r">Après échéance</span>');
@@ -370,7 +370,7 @@
     const meta = ['<span class="kind">' + kinds + labels + '</span><span>· ' + E.fmtMin(dur) + (durTodo && durTodo !== dur ? ' (reste ' + E.fmtMin(durTodo) + ')' : '') + '</span>'];
     if (forecast) meta.push('<span class="badge"' + predictTitle(p) + '>' + ic('calendar') + 'Prévu · attendus le ' + Number((p.expected_date || '').slice(8)) + '</span>');
     if (allLocked) meta.push('<span class="badge k">' + ic('lock') + 'Verrouillé</span>'); else if (anyLocked) meta.push('<span class="badge k">' + ic('lock') + 'En partie verrouillé</span>');
-    if (p && p.info_request === 'a_faire') meta.push('<span class="badge o">' + ic('mail') + 'Demande à faire</span>');
+    if (p && p.info_request === 'a_faire') meta.push('<span class="badge o">' + ic('mail') + 'Demande à faire</span>'); if (waitOf(p)) meta.push(waitBadge(p));
     if (late) meta.push('<span class="badge r">Retard</span>');
     if (!done && t0.due_date) meta.push('<span class="badge' + (E.daysBetween(td, t0.due_date) <= cfg().due_soon_days ? ' o' : '') + '">Éch. ' + fDM(t0.due_date) + '</span>');
     const anim = o.i !== undefined ? ' style="--i:' + o.i + '"' : '';

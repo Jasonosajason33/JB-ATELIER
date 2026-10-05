@@ -14,6 +14,7 @@ Ils forment un seul module (ils partagent les mêmes variables) : le premier ouv
 | 06-espace-collaborateur.js | page Aujourd'hui du collaborateur, aide proposée |
 | 07-vues-production.js | vues Aujourd'hui, Planning, Équipe, Réceptions, Dossiers, Recherche |
 | 071-planning-cockpit.js | V26.186 : onglet Planning « cockpit » — 4 indicateurs, frise horaire de l'équipe (Jour), semaine de l'équipe, filtres, tâches à affecter, cartes de pilotage, « Optimiser le planning » — styles dans `app/design-planning.css` |
+| 072-attente-causes.js | V26.206 : dossiers « en attente du client » (retirés du planning, cadence de relance J+3 / J+7 / J+10), cause d'un retard demandée à la clôture, section « Fiabilité du planning » du Pilotage (attente client, délai de réponse des clients, Pareto des causes, temps prévu / réel) |
 | 08-pilotage-synthese.js | Pilotage, surcharges prévues, dossiers à risque, synthèse hebdomadaire, vue Historique |
 | 09-indicateurs-historique-parametres.js | Indicateurs (KPI), liste de l'historique, suivi des migrations, Export, Paramètres |
 | 10-feuilles.js | fenêtres de détail et formulaires |

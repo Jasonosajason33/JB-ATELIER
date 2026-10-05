@@ -1,4 +1,4 @@
-# JB Flow — fichier de reprise (état au 3 octobre 2026, version 26.205)
+# JB Flow — fichier de reprise (état au 3 octobre 2026, version 26.206)
 
 Coller ce fichier au début d'une nouvelle session Claude (cloud ou locale) pour reprendre le travail sans perte.
 Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraison, vocabulaire, module Révision, film).
@@ -7,7 +7,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - Application statique `app/` mise en ligne sur Cloudflare (https://jbflow.app-flow.workers.dev) depuis le dépôt GitHub « JB-FLOW-AUTOMATIC » (commande de build : `node build.js`). Base de données Supabase.
 - Sources : `src/app/NN-*.js`, assemblées dans `app/app.js` par `build.ps1` (PC sans Node) ou `build.js`.
 - Démo publiée (données fictives) : https://claude.ai/artifact/PaW1TkQGP4JfcWnmWqchyj — page `pub-demo/jbflow-demo.html`.
-- Tests du moteur : `app/tests/moteur.html` (7 tests, tous verts en 26.205).
+- Tests du moteur : `app/tests/moteur.html` (7 tests, tous verts en 26.206).
 - Dépôt de travail : GitHub « JB-ATELIER » (branche `claude/new-session-hylho7`) contient `app/`, `src/`, `supabase/`, `pub-demo/` et `sim/preview-cards.css`. Le dépôt « JB-FLOW-AUTOMATIC » (mis en ligne par Cloudflare) était resté en 26.45 au 3 octobre.
 - Outils de test automatisés (Edge sans fenêtre) : `sim/build-steps.ps1` + `sim/cdp-steps.ps1` ; aides `sim/crypto-helpers.js`.
 
@@ -22,7 +22,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - Aperçu « cartes de tâches fines + coche minimaliste » : visible seulement dans la démo (`sim/preview-cards.css`, ajouté à `pub-demo/design-effects.css` à chaque copie) — à valider avant intégration.
 - Après déploiement de la 26.181 et plus : ouvrir l'application avec le compte administrateur, dans sa propre vue, pour nettoyer automatiquement les doublons de tableaux de bord déjà enregistrés.
 
-## Dernières versions (26.176 → 26.205)
+## Dernières versions (26.176 → 26.206)
 - 26.176 : système d'animation commun aux 4 thèmes (`app/design-motion.css`, `src/app/021-mouvement.js` : FAST 140 / MEDIUM 200 / SLOW 280 ms, courbe cubic-bezier(.22, 1, .36, 1)).
 - 26.177 → 26.180 : cartes affinées (TVA, alertes, IS / CFE / CVAE, réceptions ajustées, historique, Dashboard Clients, fenêtre du Suivi TVA) ; effet de clic « ripple » (380 ms) ; doublons de tableaux de bord corrigés.
 - 26.181 : audit — plus aucune action ne gonfle un planning (temps d'un dossier scindé, demandes d'informations, réception partielle, génération du mois, création / import de dossiers).
@@ -50,6 +50,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - 26.203 : Planning — listes ouvertes par les 4 indicateurs et « À surveiller » : lignes deux fois moins hautes, sur une seule ligne (`.pc-frame`, `app/design-planning.css`).
 - 26.204 : pause déjeuner 12:30 → 13:30 (réglages `lunch_start` / `lunch_end`, par défaut) : les heures affichées la sautent partout (`withTimes` → `clockSegs`), zone grisée « Pause » dans la vue Jour, tâche à cheval coupée en deux blocs (« partie 1 » / « suite »), fin de capacité décalée d'1 h. Vue Jour : glisser une tâche sur une autre de la même personne les intervertit (`pcSwap`, renumérote `seq`) ; une tâche verrouillée peut être réordonnée mais pas changée de jour/personne (message).
 - 26.205 : la ligne « À affecter » (Jour et Semaine) est toujours affichée et reçoit les tâches : une tâche planifiée qu'on y dépose perd sa date et est déverrouillée (`pcUnplan`, `data-drop="unpl"`). Attention : une replanification du mois peut la replacer.
+- 26.206 : fiabilité du planning. (1) Réserve pour imprévus : `reserve_pct` (20 % par défaut, défini dans `cfg()`, absent des défauts du moteur) et `reserve_by` par personne (fiche collaborateur) — `E.capacityOn` renvoie la capacité planifiable (`raw` = capacité totale), zone hachurée « Imprévus » en fin de journée (vue Jour). (2) « En attente du client » : `productions.filing.wait = {since, why, by}` (sans migration), tâches retirées du planning et ignorées par `plan()` / `rebalance()` (`E.onHold`), relances J+3 / J+7 puis « À signaler au manager » à J+10, « Réponse reçue — reprendre » replanifie (historique `attente` / `attente_fin`). (3) Cause du retard demandée à la clôture d'une tâche en retard (historique `terminee`, `detail.cause`). Pilotage › Vue d'ensemble : section « Fiabilité du planning » (attente client, délai moyen de réponse, Pareto des causes, temps prévu / réel). Fichier `src/app/072-attente-causes.js`.
 
 ## Film de présentation (v3 du 1er octobre 2026 — à reprendre plus tard)
 - But : présenter JB Flow aux supérieurs. Lien : https://claude.ai/artifact/J1CXu3csSo28ST8YGcrTpH (v3 publiée).

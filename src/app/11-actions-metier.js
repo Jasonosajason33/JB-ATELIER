@@ -11,6 +11,7 @@
   }
   async function moveTask(t, date, toCollab) {
     if (!canEditTask(t) || t.locked || t.done) return;
+    if (date && t.kind !== 'info' && waitOf(S.data.productions.get(t.production_id))) { toast((clientOf(t.client_id) || {}).name + ' est en attente du client : cliquez « Réponse reçue — reprendre » dans sa fiche avant de le planifier.', 'warn', null, 5000); return; } // V26.206
     if (date && !E.isWorkday(date)) { const nd = E.nextWorkday(date); toast(fDate(date) + (E.holidayName(date) ? ' est férié (' + E.holidayName(date) + ')' : ' est un week-end') + ' : déplacé au ' + fDate(nd) + '.', 'warn', null, 4000); date = nd; }
     // V26.74 : glisser-déposer entre le planning du tuteur et celui de son apprenti
     const who = toCollab && toCollab !== t.collaborator_id && canSeeCollab(toCollab) ? toCollab : t.collaborator_id;
@@ -38,11 +39,11 @@
     alloc[td] = Math.max(0, (Number(t.duration_min) || 0) - used);
     return { planned_date: t.planned_date, alloc: Object.keys(alloc).length > 1 ? alloc : null };
   }
-  async function toggleDone(t, extra) {
+  async function toggleDone(t, extra, meta) {
     if (!canEditTask(t)) return;
     const td = today();
     const patch = t.done ? { done: false, done_at: null, actual_min: null } : Object.assign({ done: true, done_at: nowStamp() }, doneSpan(t, td), extra || {});
-    const r = await saveUpdate('tasks', t.id, patch, { history: { action: t.done ? 'reouverte' : 'terminee', entity: 'task', entity_id: t.id, client_id: t.client_id, detail: { kind: t.kind, text: !t.done && t.planned_date && t.planned_date > td ? 'prévue le ' + fDMY(t.planned_date) + ', réalisée le ' + fDMY(td) : '' } } });
+    const r = await saveUpdate('tasks', t.id, patch, { history: { action: t.done ? 'reouverte' : 'terminee', entity: 'task', entity_id: t.id, client_id: t.client_id, detail: { kind: t.kind, cause: (!t.done && meta && meta.cause) || undefined, text: !t.done && t.planned_date && t.planned_date > td ? 'prévue le ' + fDMY(t.planned_date) + ', réalisée le ' + fDMY(td) : '' } } });
     if (r === 'ok') {
       syncProdStatus(t.production_id);
       if (patch.done) { S.justDone.add(t.id); scheduleRender(); setTimeout(() => S.justDone.delete(t.id), 900); }

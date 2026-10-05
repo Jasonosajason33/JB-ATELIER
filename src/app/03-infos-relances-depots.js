@@ -69,7 +69,8 @@
       if (r.note !== undefined) { const p = S.data.productions.get(t.production_id); if (p && (p.tva_note || '') !== r.note) await saveUpdate('productions', p.id, { tva_note: r.note || null }, { quiet: true, history: { action: 'dossier', entity: 'production', entity_id: p.id, client_id: p.client_id, detail: { text: 'Commentaire du mois ' + (r.note ? 'modifié' : 'effacé') } } }); }
       extra.actual_min = r.actual;
       t = S.data.tasks.get(t.id) || t;
-      const res = await toggleDone(t, extra);
+      const res = await toggleDone(t, extra, { cause: r.cause });
+      if (res === 'ok') noteCause(t, r.cause);
       const dt = r.dash && S.data.tasks.get(r.dash);
       if (res === 'ok' && dt && !dt.done && (await toggleDone(dt, { actual_min: null })) === 'ok') toast('Tableau de bord noté fait et retiré du planning.', 'ok', null, 3500);
       return res;
@@ -81,8 +82,9 @@
     const allDone = ts.every(t => t.done);
     if (!allDone && !(await askInfo(ts[0].production_id))) return;
     const todo = allDone ? ts : ts.filter(t => !t.done);
+    const cause = !allDone && todo.some(isLateNow) ? await askCause(clientOf(ts[0].client_id)) : null; // V26.206
     let ok = true;
-    for (const t of todo) { const cur = S.data.tasks.get(t.id); if (cur && (await toggleDone(cur)) !== 'ok') ok = false; }
+    for (const t of todo) { const cur = S.data.tasks.get(t.id); if (cur && (await toggleDone(cur, undefined, cause && isLateNow(cur) ? { cause } : null)) !== 'ok') ok = false; else if (cause && isLateNow(t)) noteCause(t, cause); }
     return ok ? 'ok' : 'failed';
   }
   async function lockGroup(ts) {
@@ -102,7 +104,7 @@
       + '<div class="sheet-b">' + remoteNotice(s)
       + '<div class="row">' + (done ? '<span class="badge g">' + ic('check') + 'Dossier terminé</span>' : '<span class="badge">À faire</span>') + '<span class="badge b">' + ic('merge') + 'Réalisé en une fois</span>' + (anyLocked ? '<span class="badge k">' + ic('lock') + (allLocked ? 'Verrouillé' : 'En partie verrouillé') + '</span>' : '') + (t0.due_date ? '<span class="badge">Échéance TVA ' + fDM(t0.due_date) + '</span>' : '') + '</div>'
       + '<div class="frame"><div class="frame-h">' + ic('route', 'sm') + '<h2>Parcours du dossier</h2></div><div class="inner">' + prodTimeline(p) + '</div></div>'
-      + irBox(p)
+      + irBox(p) + waitBox(p)
       + '<div class="form"><label class="f"><span>Date planifiée (tout le dossier)</span><input type="date" data-ch="g-date" data-key="' + groupKey(ts) + '" value="' + (t0.planned_date || '') + '"' + (edit && !anyLocked && !done ? '' : ' disabled') + '></label></div>'
       + '<div><h3 style="margin-bottom:8px">Tâches</h3><div class="tasks">' + ts.map(t => taskRow(t, { swipe: false })).join('') + '</div></div></div>'
       + '<div class="sheet-f">' + (edit ? '<button class="btn" data-act="lock-group" data-key="' + groupKey(ts) + '">' + ic('lock', 'sm') + (allLocked ? 'Déverrouiller' : 'Verrouiller') + '</button><button class="btn ' + (done ? '' : 'primary') + '" data-act="done-group" data-key="' + groupKey(ts) + '">' + (done ? ic('refresh', 'sm') + 'Rouvrir' : ic('check', 'sm') + 'Terminer le dossier') + '</button>' : '') + '<button class="btn" data-act="close">Fermer</button></div>';
@@ -203,7 +205,8 @@
     const td = today(), ts = list('tasks').filter(t => t.month === m && t.collaborator_id === cid && !t.done);
     const exp = t => (S.data.productions.get(t.production_id) || {}).expected_date || '';
     return {
-      unpl: ts.filter(t => t.kind !== 'info' && !t.planned_date),
+      unpl: ts.filter(t => t.kind !== 'info' && !t.planned_date && !waitOf(S.data.productions.get(t.production_id))),
+      wait: ts.filter(t => t.kind !== 'info' && waitOf(S.data.productions.get(t.production_id))), // V26.206
       late: ts.filter(t => (t.planned_date && E.endDate(t) < td) || (t.due_date && t.due_date < td)),
       recv: ts.filter(t => t.kind !== 'info' && !E.isReceived(t, S.data.productions.get(t.production_id))).sort((a, b) => exp(a).localeCompare(exp(b))),
       info: ts.filter(t => t.kind === 'info'),
@@ -582,17 +585,19 @@
   function finishDialog(t) {
     const p = S.data.productions.get(t.production_id), c = clientOf(t.client_id) || {};
     const needIr = t.kind !== 'info' && p && !p.info_request;
+    const late = isLateNow(t); // V26.206 : cause du retard demandée en un clic
     const planned = Number(t.duration_min) || 0;
     // Tableau de bord du même client encore à faire : peut être fait en même temps que la production
     const dash = !['info', 'dashboard'].includes(t.kind) ? list('tasks').filter(x => x.kind === 'dashboard' && x.client_id === t.client_id && !x.done && x.month >= t.month).sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''))[0] : null;
     const dashLbl = dash ? (dash.period ? 'de ' + fMonth(dash.period) : '') + ' (à publier avant le ' + fDM(dash.due_date) + ')' : '';
     return new Promise(resolve => {
-      let ir = null;
+      let ir = null, cause = null;
       const root = document.createElement('div');
       root.className = 'overlay anim center';
       root.innerHTML = '<div class="sheet" role="dialog" aria-modal="true" style="width:min(480px,100%)"><div class="sheet-h"><div style="margin-right:auto"><h2>Terminer — ' + esc(c.name) + '</h2><div class="small muted" style="margin-top:4px">' + E.KIND_LABEL[t.kind] + ' · temps prévu ' + E.fmtMin(planned) + '</div></div></div>'
         + '<div class="sheet-b">' + (c.sous_traitance ? '<div role="note" style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 12%,transparent)">' + ic('alert', 'sm') + '<div><b>Rappel — Sous-traitance en place</b><div class="small">La tenue comptable n\'est pas effectuée par le cabinet : <b>uniquement la TVA à faire</b>. Indique le temps passé sur la TVA seulement.</div></div></div>' : '') + '<label class="f"><span>Temps réellement passé</span><div class="time-in"><button type="button" class="btn icon" data-d="-15" aria-label="Moins 15 minutes">−</button><input type="text" id="fd-time" value="' + E.fmtMin(planned) + '" inputmode="text" autocomplete="off"><button type="button" class="btn icon" data-d="15" aria-label="Plus 15 minutes">+</button></div></label>'
         + '<p class="small muted" style="margin:-6px 0 0">Formats acceptés : 1h30, 1:30, 90 min. Tes temps me servent à ajuster ton planning et harmoniser ton niveau d\'activité.</p>'
+        + (late ? causeChips() : '')
         + (needIr ? '<div><div class="small muted" style="margin-bottom:8px"><b style="color:var(--text)">Demande d\'informations au client</b></div><div class="ir">' + IR_OPTS.map(o => '<button type="button" class="' + o[0] + '" data-ir="' + o[0] + '">' + ic(o[2], 'sm') + o[1] + '</button>').join('') + '</div></div>' : '')
         + (dash ? '<label class="cb" style="align-items:flex-start"><input type="checkbox" id="fd-dash"><span><b>Tableau de bord ' + esc(dashLbl) + ' fait en même temps</b><br><span class="small muted">Il sera noté fait et retiré du planning.</span></span></label>' : '')
         + (p ? '<div class="fd-note"><label class="f"><span>Commentaire du mois <em class="small muted">— repris dans le Récap TVA</em></span><textarea id="fd-note" rows="2" maxlength="240" placeholder="Ex. : manque le détail des encaissements Airbnb">' + esc(p.tva_note || '') + '</textarea></label></div>' : '')
@@ -604,14 +609,16 @@
       const submit = () => {
         const n = E.parseDuration(inp.value);
         if (isNaN(n) || n <= 0) return fail('Temps illisible (ex. 1h30, 45 min).');
+        if (late && !cause) return fail('Indiquez la cause du retard (un clic).');
         if (needIr && !ir) return fail('Indiquez si une demande d\'informations est faite, à faire ou non nécessaire.');
         const nt = root.querySelector('#fd-note');
-        done({ actual: n, ir, dash: dash && root.querySelector('#fd-dash').checked ? dash.id : null, note: nt ? nt.value.trim() : undefined });
+        done({ actual: n, ir, cause, dash: dash && root.querySelector('#fd-dash').checked ? dash.id : null, note: nt ? nt.value.trim() : undefined });
       };
       const onKey = e => { if (e.key === 'Enter' && e.target === inp) { e.preventDefault(); submit(); } if (e.key === 'Escape') { e.stopPropagation(); done(null); } };
       document.addEventListener('keydown', onKey, true);
       root.addEventListener('click', e => {
-        const d = e.target.closest('[data-d]'), b = e.target.closest('[data-ir]'), x = e.target.closest('[data-x]');
+        const d = e.target.closest('[data-d]'), b = e.target.closest('[data-ir]'), x = e.target.closest('[data-x]'), k = e.target.closest('[data-cause]');
+        if (k) { cause = k.dataset.cause; root.querySelectorAll('[data-cause]').forEach(el => el.classList.toggle('on', el === k)); err.style.display = 'none'; return; }
         if (d) { const n = E.parseDuration(inp.value); inp.value = E.fmtMin(Math.max(5, (isNaN(n) ? planned : n) + Number(d.dataset.d))); }
         else if (b) { ir = b.dataset.ir; root.querySelectorAll('[data-ir]').forEach(el => el.classList.toggle('on', el === b)); err.style.display = 'none'; }
         else if (x) x.dataset.x === 'ok' ? submit() : done(null);

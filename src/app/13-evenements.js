@@ -60,6 +60,10 @@
     'done-group': (el, e) => { e.stopPropagation(); finishGroup(groupFromKey(el.dataset.key)); },
     'lock-group': el => lockGroup(groupFromKey(el.dataset.key)),
     'ir-list': el => openSheet({ type: 'irList', wide: true, ids: (el.dataset.ids || '').split(',').filter(Boolean) }), // V26.197
+    'wait-pick': el => { S.waitPick = el.dataset.pid; renderSheet(); }, // V26.206 : en attente du client
+    'wait-set': el => { S.waitPick = null; setWait(el.dataset.pid, el.dataset.why).then(() => { if (S.sheet) renderSheet(); }); },
+    'wait-end': el => endWait(el.dataset.pid).then(() => { if (S.sheet) renderSheet(); }),
+    'wait-rel': el => { if (el.dataset.via === 'tel') relanceTel(el.dataset.pid); else relanceMail(el.dataset.pid); },
     ir: el => setInfoRequest(el.dataset.pid, el.dataset.v).then(r => { if (r === 'ok') toast(IR_LABEL[el.dataset.v] + ' — enregistré.', 'ok', null, 2500); }),
     lock: el => { const t = S.data.tasks.get(el.dataset.id); if (t) toggleLock(t); },
     alert: el => {
@@ -203,6 +207,11 @@
       const u = S.data.app_users.get(s.id); if (!u) return;
       if (await setUserStart(u.email, el.value)) toast('Début d\'utilisation de ' + u.name + ' : ' + (el.value ? fMonth(el.value) : 'comme le cabinet') + '.', 'ok', null, 3000);
     },
+    'co-reserve': async el => { // V26.206 : réserve pour imprévus d'une personne (vide = comme le cabinet)
+      const s = S.sheet, c = s && S.data.collaborators.get(s.id); if (!c) return;
+      const by = Object.assign({}, cfg().reserve_by || {}); if (el.value === '') delete by[c.id]; else by[c.id] = Number(el.value);
+      if (await savePlanning({ reserve_by: by }, c.name + ' : temps réservé aux imprévus ' + (el.value === '' ? 'comme le cabinet' : el.value + ' %'))) { renderSheet(); render(); toast('Imprévus de ' + c.name + ' : ' + (el.value === '' ? 'comme le cabinet' : el.value + ' %') + '. « Replanifier le mois » l\'applique aux dossiers déjà placés.', 'ok', null, 5000); }
+    },
     setting: el => {
       const k = el.dataset.k; let v = el.type === 'checkbox' ? el.checked : el.value;
       if (el.type === 'number') v = Number(v);
@@ -212,6 +221,7 @@
       const cur = S.data.settings.get('planning');
       const value = Object.assign({}, cfg(), { [k]: v });
       if (value.start_day >= value.end_day) { toast('Le début de période doit précéder la fin.', 'warn'); render(); return; }
+      if (k === 'reserve_pct') { v = Math.min(60, Math.max(0, Number(v) || 0)); setTimeout(() => toast('Temps réservé aux imprévus : ' + v + ' %. « Replanifier le mois » l\'applique aux dossiers déjà placés.', 'ok', null, 5000), 300); }
       if (k === 'info_request_min' && isManager()) setTimeout(() => toast('Durée des demandes d\'informations mise à jour : elle s\'applique aux nouvelles demandes.', 'ok', null, 5000), 300);
       if (cur) saveUpdate('settings', 'planning', { value }, { history: { action: 'parametres', detail: { text: k + ' = ' + JSON.stringify(v) } } }).then(r => { if (r === 'ok' && k === 'agent_enabled' && v) runAgent().then(() => render()); });
       else saveInsert('settings', [{ id: 'planning', value }]).catch(() => { });

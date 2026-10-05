@@ -73,7 +73,7 @@
 
   /* ---------- Listes (reprend les filtres rapides de l'outil, pour toute l'équipe affichée) ---------- */
   function pcSets(cs, m) {
-    const out = { unpl: [], late: [], recv: [], info: [], done: [], tvatodo: [], tvasent: [] }, ids = new Set(cs.map(c => c.id)), td = today();
+    const out = { unpl: [], wait: [], late: [], recv: [], info: [], done: [], tvatodo: [], tvasent: [] }, ids = new Set(cs.map(c => c.id)), td = today();
     cs.forEach(c => { const q = quickSets(c.id, m); Object.keys(out).forEach(k => out[k].push(...q[k])); });
     if (isAdmin() && S.planAll) out.unpl.push(...list('tasks').filter(t => t.month === m && !t.collaborator_id && !t.done && t.kind !== 'info')); // dossier sans collaborateur
     const open = list('tasks').filter(t => ids.has(t.collaborator_id) && !t.done);
@@ -81,13 +81,13 @@
     out.soon = open.filter(t => t.kind !== 'info' && t.due_date && t.due_date >= td && E.daysBetween(td, t.due_date) <= cfg().due_soon_days).sort((a, b) => a.due_date.localeCompare(b.due_date));
     return out;
   }
-  const PC_LISTS = { today: ['À traiter aujourd\'hui', 'clock', 'r'], soon: ['Échéances proches', 'flag', 'o'] };
+  const PC_LISTS = { today: ['À traiter aujourd\'hui', 'clock', 'r'], soon: ['Échéances proches', 'flag', 'o'], wait: ['En attente du client', 'clock', 'o'] };
   function pcListFrame(sets, m) {
     const k = S.quick; if (!k || !sets[k]) return '';
     const q = QUICK.find(d => d[0] === k), def = PC_LISTS[k] || (q && [q[1], q[2], q[3]]); if (!def) return '';
     const ts = sets[k], title = k === 'done' ? 'Terminées · ' + fMonth(m) : k === 'unpl' ? 'Tâches à affecter · ' + fMonth(m) : def[0];
     return '<div class="frame pc-frame anim-in no-print"><div class="frame-h">' + ic(def[1]) + '<h2>' + esc(title) + '</h2><span class="badge ' + def[2] + '">' + ts.length + '</span><button class="x" data-act="quick" data-q="' + k + '" aria-label="Fermer la liste">' + ic('x', 'sm') + '</button></div><div class="inner">'
-      + (k === 'unpl' && ts.length ? '<p class="small" style="margin:0 0 10px">' + unplWhy(ts, m) + '</p>' : QUICK_TIP[k] ? '<p class="small muted" style="margin:0 0 10px">' + esc(QUICK_TIP[k]) + '</p>' : '')
+      + (k === 'unpl' && ts.length ? '<p class="small" style="margin:0 0 10px">' + unplWhy(ts, m) + '</p>' : k === 'wait' ? '<p class="small muted" style="margin:0 0 10px">Dossiers bloqués par le client : retirés du planning jusqu\'à la réponse. Ouvrez-en un pour noter une relance ou le reprendre.</p>' : QUICK_TIP[k] ? '<p class="small muted" style="margin:0 0 10px">' + esc(QUICK_TIP[k]) + '</p>' : '')
       + (ts.length ? '<div class="tasks">' + ts.slice(0, 60).map(t => taskRow(t, { showDate: true, showCollab: S.planAll, swipe: false, drag: k === 'unpl' || k === 'late' })).join('') + '</div>' + (ts.length > 60 ? '<p class="small muted">+ ' + (ts.length - 60) + ' autre(s)</p>' : '') : '<div class="empty">Rien à signaler.</div>') + '</div></div>';
   }
 
@@ -168,12 +168,12 @@
     const x = ctx(), td = today(), st0 = E.parseClock(cfg().day_start), all = list('tasks');
     const rows = pcScope().map(c => {
       const items = withTimes(dayTasks(c.id, d), d).map(it => ({ t: it.t, a: it.segs[0].a, b: it.segs[it.segs.length - 1].b, segs: it.segs }));
-      const cap = E.capacityOn(c, d, x), load = E.loadOf(all, c.id, d).total;
-      return { c, items, cap, load, ab: E.absenceOn(c.id, d, x) };
+      const cap = E.capacityOn(c, d, x), load = E.loadOf(all, c.id, d).total, full = E.capacityOn(c, d, x, true);
+      return { c, items, cap, full, load, ab: E.absenceOn(c.id, d, x) };
     });
     let h0 = Math.min(PC.H0, Math.floor(st0 / 60) * 60), h1 = PC.H1;
     const capEndOf = cap => { const sg = clockSegs(st0, cap); return sg[sg.length - 1].b; }, L = lunchOf();
-    rows.forEach(r => { r.items.forEach(i => { h1 = Math.max(h1, Math.ceil(i.b / 60) * 60); }); if (r.cap) h1 = Math.max(h1, Math.ceil(capEndOf(r.cap) / 60) * 60); });
+    rows.forEach(r => { r.items.forEach(i => { h1 = Math.max(h1, Math.ceil(i.b / 60) * 60); }); if (r.full) h1 = Math.max(h1, Math.ceil(capEndOf(r.full) / 60) * 60); });
     h1 = Math.min(Math.max(h1, h0 + 60), 24 * 60);
     const span = h1 - h0, hours = span / 60, pos = v => ((v - h0) / span * 100).toFixed(3) + '%';
     const head = '<div class="pc-row pc-head"><div class="pc-who pc-who-h"><b>' + (S.planAll ? 'Équipe' : 'Planning') + '</b><span>' + rows.length + ' personne' + (rows.length > 1 ? 's' : '') + '</span></div><div class="pc-hours">'
@@ -186,9 +186,11 @@
       const f = pcFill(r.load, r.cap), hol = x.settings.holidays && E.holidayName(d), off = r.cap <= 0;
       const offLbl = hol ? 'Férié · ' + hol : r.ab && (r.ab.minutes === null || r.ab.minutes === undefined || r.ab.minutes === '') ? absLabel(r.ab) : r.c.kind === 'apprenti' ? 'École / hors entreprise' : 'Non travaillé';
       const shown = r.items.filter(i => pcMatch(i.t, pcState(i.t, d, i)));
-      const lastEnd = r.items.reduce((v, i) => Math.max(v, i.b), st0), capEnd = capEndOf(r.cap);
+      const lastEnd = r.items.reduce((v, i) => Math.max(v, i.b), st0), capEnd = capEndOf(r.cap), resM = off ? 0 : Math.max(0, r.full - r.cap), fullEnd = resM ? capEndOf(r.full) : capEnd;
+      // V26.206 : temps gardé pour les imprévus, en fin de journée (jamais planifié)
+      const res = resM && fullEnd > capEnd ? '<i class="pc-res" style="left:' + pos(Math.min(capEnd, h1)) + ';width:' + ((Math.min(fullEnd, h1) - Math.min(capEnd, h1)) / span * 100).toFixed(3) + '%" title="Temps gardé pour les imprévus (appels, mails, questions) : ' + E.fmtMin(resM) + '"><span>' + (resM >= 50 ? 'Imprévus · ' : '') + E.fmtMin(resM) + '</span></i>' : '';
       const ghost = !off && capEnd > lastEnd && d >= td && !pcFiltered() ? '<div class="pc-free" style="left:' + pos(lastEnd) + ';width:' + ((capEnd - lastEnd) / span * 100).toFixed(3) + '%" title="Disponible : ' + E.fmtMin(Math.max(0, r.cap - r.load)) + '"><span>' + (r.cap - r.load >= 50 ? 'Disponible · ' : '') + E.fmtMin(Math.max(0, r.cap - r.load)) + '</span></div>' : '';
-      const zones = '<i class="pc-zone" style="left:0;width:' + pos(st0) + '"></i>' + (off || L.b <= L.a || L.b <= h0 || L.a >= h1 ? '' : '<i class="pc-lunch" style="left:' + pos(L.a) + ';width:' + ((L.b - L.a) / span * 100).toFixed(3) + '%"><span>Pause</span></i>') + (off ? '' : '<i class="pc-zone" style="left:' + pos(Math.min(capEnd, h1)) + ';right:0"></i><i class="pc-capend' + (overAlert(r.load, r.cap) ? ' over' : '') + '" style="left:' + pos(Math.min(capEnd, h1)) + '"></i>');
+      const zones = '<i class="pc-zone" style="left:0;width:' + pos(st0) + '"></i>' + (off || L.b <= L.a || L.b <= h0 || L.a >= h1 ? '' : '<i class="pc-lunch" style="left:' + pos(L.a) + ';width:' + ((L.b - L.a) / span * 100).toFixed(3) + '%"><span>Pause</span></i>') + (off ? '' : res + '<i class="pc-zone" style="left:' + pos(Math.min(fullEnd, h1)) + ';right:0"></i><i class="pc-capend' + (overAlert(r.load, r.cap) ? ' over' : '') + '" style="left:' + pos(Math.min(capEnd, h1)) + '"></i>');
       return '<div class="pc-row' + (off ? ' off' : '') + '"><div class="pc-who">' + pcAv(r.c) + '<div class="pc-who-t"><b>' + esc(r.c.name) + (r.c.id === S.me.collaborator_id ? ' <small>moi</small>' : '') + '</b><span>' + esc(PC_KIND[r.c.kind] || '') + '</span>'
         + '<span class="pc-who-load"><b>' + E.fmtMin(r.load) + '</b>' + (r.cap ? ' / ' + E.fmtMin(r.cap) : '') + '<span class="lbl"> planifiées</span></span>' + (off && !r.load ? '' : pcBar(f, true) + '<span class="pc-who-f f-' + f.cls + '">' + esc(f.txt) + '</span>') + '</div></div>'
         + '<div class="pc-track" data-drop="' + d + '" data-dc="' + r.c.id + '">' + zones + (off ? '<span class="pc-off-l">' + esc(offLbl) + '</span>' : '') + ghost + shown.map(i => i.segs.map((sg, k) => pcBlock(i, d, h0, span, sg, k, i.segs.length)).join('')).join('') + '</div></div>';
@@ -243,6 +245,7 @@
       sets.late.length && ['late', 'alert', 'r', 'En retard', sets.late.length],
       sets.soon.length && ['soon', 'flag', 'o', 'Échéances dans les ' + cfg().due_soon_days + ' jours', sets.soon.length],
       sets.info.length && ['info', 'mail', 'o', 'Demandes d\'infos à faire', sets.info.length],
+      sets.wait.length && (() => { const ps = [...new Set(sets.wait.map(t => t.production_id))].map(id => S.data.productions.get(id)).filter(Boolean), due = ps.filter(p => (waitStage(p) || {}).due).length; return ['wait', 'clock', due ? 'r' : 'o', 'En attente client' + (due ? ' · ' + due + ' relance' + (due > 1 ? 's' : '') + ' à faire' : ''), ps.length]; })(), // V26.206
       sets.tvatodo.length && ['tvatodo', 'file', 'o', 'TVA à déposer (tenue terminée)', sets.tvatodo.length],
       sets.recv.length && ['recv', 'inbox', 'b', 'Éléments attendus', sets.recv.length]
     ].filter(Boolean);

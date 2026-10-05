@@ -28,6 +28,8 @@
     freeze_days: 1,          // zone figée : aujourd'hui + N jour(s) ouvré(s) ne sont pas bousculés (sauf replanification forcée)
     mid_day: 21,             // premier jalon d'échéances TVA suivi (« l'équipe tient le 21 »), en plus de la fin de période
     agent_enabled: true      // agent de planification : apprend des mois précédents (dates de réception, temps réels)
+    // V26.206 : reserve_pct (part de la journée gardée pour les imprévus, 0 si absent) et reserve_by {id: %}
+    // ne figurent pas ici, pour que le défaut de l'application (20 %) s'applique tant que rien n'est enregistré.
   };
 
   /* ---------- Dates (chaînes 'YYYY-MM-DD', heure locale) ---------- */
@@ -176,8 +178,8 @@
     if (hit && hit.arr === arr) return hit.set;
     const set = new Set(arr); PRES.set(collab, { arr, set }); return set;
   }
-  /* Minutes disponibles d'un collaborateur un jour donné. */
-  function capacityOn(collab, date, ctx) {
+  /* Minutes disponibles d'un collaborateur un jour donné (réserve pour imprévus déduite, sauf raw). */
+  function capacityOn(collab, date, ctx, raw) {
     if (!collab || collab.active === false) return 0;
     if (dow(date) >= 6) return 0; // samedi et dimanche : jamais travaillés
     const wd = collab.work_days && collab.work_days.length ? collab.work_days : [1, 2, 3, 4, 5];
@@ -191,8 +193,17 @@
         cap -= Number(a.minutes) || 0;
       }
     }
-    return Math.max(0, cap);
+    if (raw) return Math.max(0, cap);
+    return Math.max(0, Math.round(cap * (1 - reserveOf(collab, ctx.settings) / 100)));
   }
+  /* V26.206 — Temps réservé aux imprévus (en %) : réglage de la personne, sinon celui du cabinet. */
+  function reserveOf(collab, settings) {
+    const st = settings || {}, by = st.reserve_by || {}, v = collab && by[collab.id] !== undefined && by[collab.id] !== null && by[collab.id] !== '' ? by[collab.id] : st.reserve_pct;
+    return Math.min(60, Math.max(0, Number(v) || 0));
+  }
+  const prodDayCap = (collab, settings) => Math.round((Number(collab && collab.daily_capacity_min) || 0) * (1 - reserveOf(collab, settings) / 100));
+  /* V26.206 — Dossier « en attente du client » : retiré du planning jusqu'à la réponse */
+  const onHold = p => !!(p && p.filing && p.filing.wait);
   function absenceOn(collabId, date, ctx) {
     return (ctx.absByCollab.get(collabId) || []).find(a => a.date_from <= date && date <= (a.date_to || a.date_from)) || null;
   }
@@ -248,7 +259,7 @@
   /* Étalement « manuel » d'une tâche longue à partir d'une date : journées complètes du collaborateur,
    * puis jours ouvrés suivants (sans tenir compte des autres tâches). */
   function spread(collab, start, dur, ctx, limit) {
-    const cap0 = Number(collab && collab.daily_capacity_min) || 0;
+    const cap0 = prodDayCap(collab, ctx.settings);
     if (!collab || !start || dur <= cap0) return null;
     const alloc = {}; let rest = dur;
     for (let d = start, i = 0; rest > 0 && i < 90; d = addDays(d, 1), i++) {
@@ -287,6 +298,7 @@
     const isFixed = t => {
       if (t.locked || t.done) return true;
       const p = prodById.get(t.production_id), rec = isReceived(t, p);
+      if (onHold(p) && t.kind !== 'info') return false; // V26.206 : en attente du client → retiré, même dans la zone figée
       // Zone figée (aujourd'hui + jours suivants) : un dossier reçu déjà placé n'est pas bousculé,
       // sauf replanification forcée ou collaborateur indisponible ce jour-là.
       if (freezeUntil && rec && t.planned_date && t.planned_date >= today && t.planned_date <= freezeUntil
@@ -340,7 +352,7 @@
     // Cherche l'emplacement d'une tâche : un seul jour si elle tient dans une journée, sinon étalement.
     function findSpot(collab, start, dur, until) {
       const end = until || win.end;
-      const dayCap = Number(collab.daily_capacity_min) || 0;
+      const dayCap = prodDayCap(collab, ctx.settings);
       if (dur <= dayCap) {
         const rem = d => Math.max(0, capacityOn(collab, d, ctx) - (used.get(key(collab.id, d)) || 0));
         for (let d = start; d <= end; d = addDays(d, 1)) {
@@ -381,6 +393,7 @@
       let prev = floor;
       for (const t of list) {
         const independent = t.kind === 'info'; // la demande d'infos ne dépend pas de l'avancement de la production
+        if (!independent && onHold(p)) { unplanned.push({ id: t.id, reason: 'En attente du client' }); placed.set(t.id, { planned_date: null, seq: 0, alloc: null }); continue; }
         let ready = readyOf(t, p);
         if (ready < floor) ready = floor;
         let start = independent || prev < ready ? ready : prev;
@@ -881,7 +894,7 @@
     const free = (c, d) => Math.max(0, capacityOn(c, d, ctx) - (used.get(key(c.id, d)) || 0));
     const cands = data.collaborators.filter(c => c.active !== false && c.kind !== 'apprenti' && (!opts.allowed || opts.allowed.has(c.id)));
     const out = [];
-    const problems = cur.filter(t => !t.done && !t.locked && t.kind === 'production' && t.collaborator_id && t.due_date && (!t.planned_date || endDate(t) > t.due_date))
+    const problems = cur.filter(t => !t.done && !t.locked && t.kind === 'production' && t.collaborator_id && t.due_date && !onHold(prodById.get(t.production_id)) && (!t.planned_date || endDate(t) > t.due_date))
       .sort((a, b) => a.due_date.localeCompare(b.due_date) || (Number(b.duration_min) || 0) - (Number(a.duration_min) || 0));
     for (const t of problems) {
       const p = prodById.get(t.production_id) || {}, dur = Number(t.duration_min) || 0;
@@ -919,7 +932,7 @@
     pad, ymd, parseYmd, addDays, dow, daysInMonth, dateInMonth, addMonths, monthDates, rangeDates, startOfWeek, daysBetween, windowOf,
     easter, holidays, holidayName,
     fmtMin, fmtClock, parseClock, parseDuration, parseDay, parsePriority, parseFrequency,
-    makeCtx, capacityOn, absenceOn, clientApplies, buildMonth, plan, clientTime, productionTask, projection, suggestTransfers, hasAlloc, segs, minutesOn, endDate, onDay, spread, loadOf, levelOf, productionStatus, alerts, dashboard,
+    makeCtx, capacityOn, reserveOf, onHold, absenceOn, clientApplies, buildMonth, plan, clientTime, productionTask, projection, suggestTransfers, hasAlloc, segs, minutesOn, endDate, onDay, spread, loadOf, levelOf, productionStatus, alerts, dashboard,
     isReceived, freezeEnd, learn, predictReception, capacityRisk, rebalance, monthsBetween, isWorkday, nextWorkday, dashboardFor, buildDashboards, milestones
   };
 })(typeof window !== 'undefined' ? window : globalThis);

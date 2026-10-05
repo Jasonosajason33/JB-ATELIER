@@ -36,7 +36,8 @@
   const startMonth = () => { const cab = cabStart(); if (!S.me || isManager()) return cab; const us = userStartOf(S.me.email); return us > cab ? us : cab; };
   // V26.202 : exception accordée par l'administrateur (Paramètres › Utilisateurs) — la personne peut modifier tous les champs des fiches des dossiers qu'elle voit
   const clientEditor = () => !!S.me && !S.readonly && (planVal().client_editors || []).map(x => String(x).toLowerCase()).includes(String(S.me.email || '').toLowerCase());
-  const cfg = () => Object.assign({}, E.DEFAULT_SETTINGS, ((S.data.settings.get('planning') || {}).value) || {});
+  // V26.206 : 20 % de chaque journée gardés pour les imprévus, par défaut (Paramètres › Planification, et par personne)
+  const cfg = () => Object.assign({}, E.DEFAULT_SETTINGS, { reserve_pct: 20 }, ((S.data.settings.get('planning') || {}).value) || {});
   // V26.73 : un administrateur peut prévisualiser l'application « comme un manager » (affichage uniquement)
   const realAdmin = () => !!((S.realMe || S.me) && (S.realMe || S.me).role === 'admin'); // V26.144 : S.realMe = l'administrateur quand il regarde l'application « en tant que » quelqu'un
   const meName = () => ((S.realMe || S.me) || {}).name || '';
@@ -678,7 +679,7 @@
     if (t.part === 'reste' && forecast) meta.push('<span class="badge">Reste attendu</span>');
     if (forecast) meta.push('<span class="badge"' + predictTitle(p) + '>' + ic('calendar') + (isManager() ? 'Prévu · attendus le ' + Number((p.expected_date || '').slice(8)) + expHint(p) : 'Éléments attendus vers le ' + Number((p.expected_date || '').slice(8)) + ' · rien à faire pour l\'instant') + '</span>' + (S.readonly ? '' : '<button class="badge b act" data-act="rec-one" data-id="' + p.id + '" title="Déclarer les éléments reçus aujourd\'hui">' + ic('inbox') + 'Reçu</button>' + (S.v7 ? '<button class="badge act" data-act="rec-part" data-id="' + p.id + '" title="Une partie seulement des éléments est arrivée">Partiel</button>' : '')));
     if (t.kind === 'production' || E.KINDS.indexOf(t.kind) < 3) E.obligations(c, t.month, cfg()).filter(o => o.code !== 'CA3').forEach(o => meta.push('<span class="badge b">' + o.label + ' · ' + fDM(o.due) + '</span>'));
-    if (t.kind !== 'info' && p && p.info_request === 'a_faire') meta.push('<span class="badge o">' + ic('mail') + 'Demande à faire</span>');
+    if (t.kind !== 'info' && p && p.info_request === 'a_faire') meta.push('<span class="badge o">' + ic('mail') + 'Demande à faire</span>'); if (t.kind !== 'info' && waitOf(p)) meta.push(waitBadge(p)); // V26.206
     if (t.locked) meta.push(canEditTask(t) && !S.readonly ? '<button class="badge k lock-btn" data-act="lock" data-id="' + t.id + '" title="Cliquer pour déverrouiller">' + ic('lock') + 'Verrouillée<span class="lock-x">· déverrouiller</span></button>' : '<span class="badge k">' + ic('lock') + 'Verrouillée</span>'); // V26.143 : déverrouiller d'un clic
     if (late) meta.push('<span class="badge o">À reprendre</span>');
     if (after) meta.push('<span class="badge r">Après échéance</span>');
@@ -717,7 +718,7 @@
     const meta = ['<span class="kind">' + kinds + labels + '</span><span>· ' + E.fmtMin(dur) + (durTodo && durTodo !== dur ? ' (reste ' + E.fmtMin(durTodo) + ')' : '') + '</span>'];
     if (forecast) meta.push('<span class="badge"' + predictTitle(p) + '>' + ic('calendar') + 'Prévu · attendus le ' + Number((p.expected_date || '').slice(8)) + '</span>');
     if (allLocked) meta.push('<span class="badge k">' + ic('lock') + 'Verrouillé</span>'); else if (anyLocked) meta.push('<span class="badge k">' + ic('lock') + 'En partie verrouillé</span>');
-    if (p && p.info_request === 'a_faire') meta.push('<span class="badge o">' + ic('mail') + 'Demande à faire</span>');
+    if (p && p.info_request === 'a_faire') meta.push('<span class="badge o">' + ic('mail') + 'Demande à faire</span>'); if (waitOf(p)) meta.push(waitBadge(p));
     if (late) meta.push('<span class="badge r">Retard</span>');
     if (!done && t0.due_date) meta.push('<span class="badge' + (E.daysBetween(td, t0.due_date) <= cfg().due_soon_days ? ' o' : '') + '">Éch. ' + fDM(t0.due_date) + '</span>');
     const anim = o.i !== undefined ? ' style="--i:' + o.i + '"' : '';
@@ -968,7 +969,8 @@
       if (r.note !== undefined) { const p = S.data.productions.get(t.production_id); if (p && (p.tva_note || '') !== r.note) await saveUpdate('productions', p.id, { tva_note: r.note || null }, { quiet: true, history: { action: 'dossier', entity: 'production', entity_id: p.id, client_id: p.client_id, detail: { text: 'Commentaire du mois ' + (r.note ? 'modifié' : 'effacé') } } }); }
       extra.actual_min = r.actual;
       t = S.data.tasks.get(t.id) || t;
-      const res = await toggleDone(t, extra);
+      const res = await toggleDone(t, extra, { cause: r.cause });
+      if (res === 'ok') noteCause(t, r.cause);
       const dt = r.dash && S.data.tasks.get(r.dash);
       if (res === 'ok' && dt && !dt.done && (await toggleDone(dt, { actual_min: null })) === 'ok') toast('Tableau de bord noté fait et retiré du planning.', 'ok', null, 3500);
       return res;
@@ -980,8 +982,9 @@
     const allDone = ts.every(t => t.done);
     if (!allDone && !(await askInfo(ts[0].production_id))) return;
     const todo = allDone ? ts : ts.filter(t => !t.done);
+    const cause = !allDone && todo.some(isLateNow) ? await askCause(clientOf(ts[0].client_id)) : null; // V26.206
     let ok = true;
-    for (const t of todo) { const cur = S.data.tasks.get(t.id); if (cur && (await toggleDone(cur)) !== 'ok') ok = false; }
+    for (const t of todo) { const cur = S.data.tasks.get(t.id); if (cur && (await toggleDone(cur, undefined, cause && isLateNow(cur) ? { cause } : null)) !== 'ok') ok = false; else if (cause && isLateNow(t)) noteCause(t, cause); }
     return ok ? 'ok' : 'failed';
   }
   async function lockGroup(ts) {
@@ -1001,7 +1004,7 @@
       + '<div class="sheet-b">' + remoteNotice(s)
       + '<div class="row">' + (done ? '<span class="badge g">' + ic('check') + 'Dossier terminé</span>' : '<span class="badge">À faire</span>') + '<span class="badge b">' + ic('merge') + 'Réalisé en une fois</span>' + (anyLocked ? '<span class="badge k">' + ic('lock') + (allLocked ? 'Verrouillé' : 'En partie verrouillé') + '</span>' : '') + (t0.due_date ? '<span class="badge">Échéance TVA ' + fDM(t0.due_date) + '</span>' : '') + '</div>'
       + '<div class="frame"><div class="frame-h">' + ic('route', 'sm') + '<h2>Parcours du dossier</h2></div><div class="inner">' + prodTimeline(p) + '</div></div>'
-      + irBox(p)
+      + irBox(p) + waitBox(p)
       + '<div class="form"><label class="f"><span>Date planifiée (tout le dossier)</span><input type="date" data-ch="g-date" data-key="' + groupKey(ts) + '" value="' + (t0.planned_date || '') + '"' + (edit && !anyLocked && !done ? '' : ' disabled') + '></label></div>'
       + '<div><h3 style="margin-bottom:8px">Tâches</h3><div class="tasks">' + ts.map(t => taskRow(t, { swipe: false })).join('') + '</div></div></div>'
       + '<div class="sheet-f">' + (edit ? '<button class="btn" data-act="lock-group" data-key="' + groupKey(ts) + '">' + ic('lock', 'sm') + (allLocked ? 'Déverrouiller' : 'Verrouiller') + '</button><button class="btn ' + (done ? '' : 'primary') + '" data-act="done-group" data-key="' + groupKey(ts) + '">' + (done ? ic('refresh', 'sm') + 'Rouvrir' : ic('check', 'sm') + 'Terminer le dossier') + '</button>' : '') + '<button class="btn" data-act="close">Fermer</button></div>';
@@ -1102,7 +1105,8 @@
     const td = today(), ts = list('tasks').filter(t => t.month === m && t.collaborator_id === cid && !t.done);
     const exp = t => (S.data.productions.get(t.production_id) || {}).expected_date || '';
     return {
-      unpl: ts.filter(t => t.kind !== 'info' && !t.planned_date),
+      unpl: ts.filter(t => t.kind !== 'info' && !t.planned_date && !waitOf(S.data.productions.get(t.production_id))),
+      wait: ts.filter(t => t.kind !== 'info' && waitOf(S.data.productions.get(t.production_id))), // V26.206
       late: ts.filter(t => (t.planned_date && E.endDate(t) < td) || (t.due_date && t.due_date < td)),
       recv: ts.filter(t => t.kind !== 'info' && !E.isReceived(t, S.data.productions.get(t.production_id))).sort((a, b) => exp(a).localeCompare(exp(b))),
       info: ts.filter(t => t.kind === 'info'),
@@ -1481,17 +1485,19 @@
   function finishDialog(t) {
     const p = S.data.productions.get(t.production_id), c = clientOf(t.client_id) || {};
     const needIr = t.kind !== 'info' && p && !p.info_request;
+    const late = isLateNow(t); // V26.206 : cause du retard demandée en un clic
     const planned = Number(t.duration_min) || 0;
     // Tableau de bord du même client encore à faire : peut être fait en même temps que la production
     const dash = !['info', 'dashboard'].includes(t.kind) ? list('tasks').filter(x => x.kind === 'dashboard' && x.client_id === t.client_id && !x.done && x.month >= t.month).sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''))[0] : null;
     const dashLbl = dash ? (dash.period ? 'de ' + fMonth(dash.period) : '') + ' (à publier avant le ' + fDM(dash.due_date) + ')' : '';
     return new Promise(resolve => {
-      let ir = null;
+      let ir = null, cause = null;
       const root = document.createElement('div');
       root.className = 'overlay anim center';
       root.innerHTML = '<div class="sheet" role="dialog" aria-modal="true" style="width:min(480px,100%)"><div class="sheet-h"><div style="margin-right:auto"><h2>Terminer — ' + esc(c.name) + '</h2><div class="small muted" style="margin-top:4px">' + E.KIND_LABEL[t.kind] + ' · temps prévu ' + E.fmtMin(planned) + '</div></div></div>'
         + '<div class="sheet-b">' + (c.sous_traitance ? '<div role="note" style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 12%,transparent)">' + ic('alert', 'sm') + '<div><b>Rappel — Sous-traitance en place</b><div class="small">La tenue comptable n\'est pas effectuée par le cabinet : <b>uniquement la TVA à faire</b>. Indique le temps passé sur la TVA seulement.</div></div></div>' : '') + '<label class="f"><span>Temps réellement passé</span><div class="time-in"><button type="button" class="btn icon" data-d="-15" aria-label="Moins 15 minutes">−</button><input type="text" id="fd-time" value="' + E.fmtMin(planned) + '" inputmode="text" autocomplete="off"><button type="button" class="btn icon" data-d="15" aria-label="Plus 15 minutes">+</button></div></label>'
         + '<p class="small muted" style="margin:-6px 0 0">Formats acceptés : 1h30, 1:30, 90 min. Tes temps me servent à ajuster ton planning et harmoniser ton niveau d\'activité.</p>'
+        + (late ? causeChips() : '')
         + (needIr ? '<div><div class="small muted" style="margin-bottom:8px"><b style="color:var(--text)">Demande d\'informations au client</b></div><div class="ir">' + IR_OPTS.map(o => '<button type="button" class="' + o[0] + '" data-ir="' + o[0] + '">' + ic(o[2], 'sm') + o[1] + '</button>').join('') + '</div></div>' : '')
         + (dash ? '<label class="cb" style="align-items:flex-start"><input type="checkbox" id="fd-dash"><span><b>Tableau de bord ' + esc(dashLbl) + ' fait en même temps</b><br><span class="small muted">Il sera noté fait et retiré du planning.</span></span></label>' : '')
         + (p ? '<div class="fd-note"><label class="f"><span>Commentaire du mois <em class="small muted">— repris dans le Récap TVA</em></span><textarea id="fd-note" rows="2" maxlength="240" placeholder="Ex. : manque le détail des encaissements Airbnb">' + esc(p.tva_note || '') + '</textarea></label></div>' : '')
@@ -1503,14 +1509,16 @@
       const submit = () => {
         const n = E.parseDuration(inp.value);
         if (isNaN(n) || n <= 0) return fail('Temps illisible (ex. 1h30, 45 min).');
+        if (late && !cause) return fail('Indiquez la cause du retard (un clic).');
         if (needIr && !ir) return fail('Indiquez si une demande d\'informations est faite, à faire ou non nécessaire.');
         const nt = root.querySelector('#fd-note');
-        done({ actual: n, ir, dash: dash && root.querySelector('#fd-dash').checked ? dash.id : null, note: nt ? nt.value.trim() : undefined });
+        done({ actual: n, ir, cause, dash: dash && root.querySelector('#fd-dash').checked ? dash.id : null, note: nt ? nt.value.trim() : undefined });
       };
       const onKey = e => { if (e.key === 'Enter' && e.target === inp) { e.preventDefault(); submit(); } if (e.key === 'Escape') { e.stopPropagation(); done(null); } };
       document.addEventListener('keydown', onKey, true);
       root.addEventListener('click', e => {
-        const d = e.target.closest('[data-d]'), b = e.target.closest('[data-ir]'), x = e.target.closest('[data-x]');
+        const d = e.target.closest('[data-d]'), b = e.target.closest('[data-ir]'), x = e.target.closest('[data-x]'), k = e.target.closest('[data-cause]');
+        if (k) { cause = k.dataset.cause; root.querySelectorAll('[data-cause]').forEach(el => el.classList.toggle('on', el === k)); err.style.display = 'none'; return; }
         if (d) { const n = E.parseDuration(inp.value); inp.value = E.fmtMin(Math.max(5, (isNaN(n) ? planned : n) + Number(d.dataset.d))); }
         else if (b) { ir = b.dataset.ir; root.querySelectorAll('[data-ir]').forEach(el => el.classList.toggle('on', el === b)); err.style.display = 'none'; }
         else if (x) x.dataset.x === 'ok' ? submit() : done(null);
@@ -3076,7 +3084,7 @@
 
   /* ---------- Listes (reprend les filtres rapides de l'outil, pour toute l'équipe affichée) ---------- */
   function pcSets(cs, m) {
-    const out = { unpl: [], late: [], recv: [], info: [], done: [], tvatodo: [], tvasent: [] }, ids = new Set(cs.map(c => c.id)), td = today();
+    const out = { unpl: [], wait: [], late: [], recv: [], info: [], done: [], tvatodo: [], tvasent: [] }, ids = new Set(cs.map(c => c.id)), td = today();
     cs.forEach(c => { const q = quickSets(c.id, m); Object.keys(out).forEach(k => out[k].push(...q[k])); });
     if (isAdmin() && S.planAll) out.unpl.push(...list('tasks').filter(t => t.month === m && !t.collaborator_id && !t.done && t.kind !== 'info')); // dossier sans collaborateur
     const open = list('tasks').filter(t => ids.has(t.collaborator_id) && !t.done);
@@ -3084,13 +3092,13 @@
     out.soon = open.filter(t => t.kind !== 'info' && t.due_date && t.due_date >= td && E.daysBetween(td, t.due_date) <= cfg().due_soon_days).sort((a, b) => a.due_date.localeCompare(b.due_date));
     return out;
   }
-  const PC_LISTS = { today: ['À traiter aujourd\'hui', 'clock', 'r'], soon: ['Échéances proches', 'flag', 'o'] };
+  const PC_LISTS = { today: ['À traiter aujourd\'hui', 'clock', 'r'], soon: ['Échéances proches', 'flag', 'o'], wait: ['En attente du client', 'clock', 'o'] };
   function pcListFrame(sets, m) {
     const k = S.quick; if (!k || !sets[k]) return '';
     const q = QUICK.find(d => d[0] === k), def = PC_LISTS[k] || (q && [q[1], q[2], q[3]]); if (!def) return '';
     const ts = sets[k], title = k === 'done' ? 'Terminées · ' + fMonth(m) : k === 'unpl' ? 'Tâches à affecter · ' + fMonth(m) : def[0];
     return '<div class="frame pc-frame anim-in no-print"><div class="frame-h">' + ic(def[1]) + '<h2>' + esc(title) + '</h2><span class="badge ' + def[2] + '">' + ts.length + '</span><button class="x" data-act="quick" data-q="' + k + '" aria-label="Fermer la liste">' + ic('x', 'sm') + '</button></div><div class="inner">'
-      + (k === 'unpl' && ts.length ? '<p class="small" style="margin:0 0 10px">' + unplWhy(ts, m) + '</p>' : QUICK_TIP[k] ? '<p class="small muted" style="margin:0 0 10px">' + esc(QUICK_TIP[k]) + '</p>' : '')
+      + (k === 'unpl' && ts.length ? '<p class="small" style="margin:0 0 10px">' + unplWhy(ts, m) + '</p>' : k === 'wait' ? '<p class="small muted" style="margin:0 0 10px">Dossiers bloqués par le client : retirés du planning jusqu\'à la réponse. Ouvrez-en un pour noter une relance ou le reprendre.</p>' : QUICK_TIP[k] ? '<p class="small muted" style="margin:0 0 10px">' + esc(QUICK_TIP[k]) + '</p>' : '')
       + (ts.length ? '<div class="tasks">' + ts.slice(0, 60).map(t => taskRow(t, { showDate: true, showCollab: S.planAll, swipe: false, drag: k === 'unpl' || k === 'late' })).join('') + '</div>' + (ts.length > 60 ? '<p class="small muted">+ ' + (ts.length - 60) + ' autre(s)</p>' : '') : '<div class="empty">Rien à signaler.</div>') + '</div></div>';
   }
 
@@ -3171,12 +3179,12 @@
     const x = ctx(), td = today(), st0 = E.parseClock(cfg().day_start), all = list('tasks');
     const rows = pcScope().map(c => {
       const items = withTimes(dayTasks(c.id, d), d).map(it => ({ t: it.t, a: it.segs[0].a, b: it.segs[it.segs.length - 1].b, segs: it.segs }));
-      const cap = E.capacityOn(c, d, x), load = E.loadOf(all, c.id, d).total;
-      return { c, items, cap, load, ab: E.absenceOn(c.id, d, x) };
+      const cap = E.capacityOn(c, d, x), load = E.loadOf(all, c.id, d).total, full = E.capacityOn(c, d, x, true);
+      return { c, items, cap, full, load, ab: E.absenceOn(c.id, d, x) };
     });
     let h0 = Math.min(PC.H0, Math.floor(st0 / 60) * 60), h1 = PC.H1;
     const capEndOf = cap => { const sg = clockSegs(st0, cap); return sg[sg.length - 1].b; }, L = lunchOf();
-    rows.forEach(r => { r.items.forEach(i => { h1 = Math.max(h1, Math.ceil(i.b / 60) * 60); }); if (r.cap) h1 = Math.max(h1, Math.ceil(capEndOf(r.cap) / 60) * 60); });
+    rows.forEach(r => { r.items.forEach(i => { h1 = Math.max(h1, Math.ceil(i.b / 60) * 60); }); if (r.full) h1 = Math.max(h1, Math.ceil(capEndOf(r.full) / 60) * 60); });
     h1 = Math.min(Math.max(h1, h0 + 60), 24 * 60);
     const span = h1 - h0, hours = span / 60, pos = v => ((v - h0) / span * 100).toFixed(3) + '%';
     const head = '<div class="pc-row pc-head"><div class="pc-who pc-who-h"><b>' + (S.planAll ? 'Équipe' : 'Planning') + '</b><span>' + rows.length + ' personne' + (rows.length > 1 ? 's' : '') + '</span></div><div class="pc-hours">'
@@ -3189,9 +3197,11 @@
       const f = pcFill(r.load, r.cap), hol = x.settings.holidays && E.holidayName(d), off = r.cap <= 0;
       const offLbl = hol ? 'Férié · ' + hol : r.ab && (r.ab.minutes === null || r.ab.minutes === undefined || r.ab.minutes === '') ? absLabel(r.ab) : r.c.kind === 'apprenti' ? 'École / hors entreprise' : 'Non travaillé';
       const shown = r.items.filter(i => pcMatch(i.t, pcState(i.t, d, i)));
-      const lastEnd = r.items.reduce((v, i) => Math.max(v, i.b), st0), capEnd = capEndOf(r.cap);
+      const lastEnd = r.items.reduce((v, i) => Math.max(v, i.b), st0), capEnd = capEndOf(r.cap), resM = off ? 0 : Math.max(0, r.full - r.cap), fullEnd = resM ? capEndOf(r.full) : capEnd;
+      // V26.206 : temps gardé pour les imprévus, en fin de journée (jamais planifié)
+      const res = resM && fullEnd > capEnd ? '<i class="pc-res" style="left:' + pos(Math.min(capEnd, h1)) + ';width:' + ((Math.min(fullEnd, h1) - Math.min(capEnd, h1)) / span * 100).toFixed(3) + '%" title="Temps gardé pour les imprévus (appels, mails, questions) : ' + E.fmtMin(resM) + '"><span>' + (resM >= 50 ? 'Imprévus · ' : '') + E.fmtMin(resM) + '</span></i>' : '';
       const ghost = !off && capEnd > lastEnd && d >= td && !pcFiltered() ? '<div class="pc-free" style="left:' + pos(lastEnd) + ';width:' + ((capEnd - lastEnd) / span * 100).toFixed(3) + '%" title="Disponible : ' + E.fmtMin(Math.max(0, r.cap - r.load)) + '"><span>' + (r.cap - r.load >= 50 ? 'Disponible · ' : '') + E.fmtMin(Math.max(0, r.cap - r.load)) + '</span></div>' : '';
-      const zones = '<i class="pc-zone" style="left:0;width:' + pos(st0) + '"></i>' + (off || L.b <= L.a || L.b <= h0 || L.a >= h1 ? '' : '<i class="pc-lunch" style="left:' + pos(L.a) + ';width:' + ((L.b - L.a) / span * 100).toFixed(3) + '%"><span>Pause</span></i>') + (off ? '' : '<i class="pc-zone" style="left:' + pos(Math.min(capEnd, h1)) + ';right:0"></i><i class="pc-capend' + (overAlert(r.load, r.cap) ? ' over' : '') + '" style="left:' + pos(Math.min(capEnd, h1)) + '"></i>');
+      const zones = '<i class="pc-zone" style="left:0;width:' + pos(st0) + '"></i>' + (off || L.b <= L.a || L.b <= h0 || L.a >= h1 ? '' : '<i class="pc-lunch" style="left:' + pos(L.a) + ';width:' + ((L.b - L.a) / span * 100).toFixed(3) + '%"><span>Pause</span></i>') + (off ? '' : res + '<i class="pc-zone" style="left:' + pos(Math.min(fullEnd, h1)) + ';right:0"></i><i class="pc-capend' + (overAlert(r.load, r.cap) ? ' over' : '') + '" style="left:' + pos(Math.min(capEnd, h1)) + '"></i>');
       return '<div class="pc-row' + (off ? ' off' : '') + '"><div class="pc-who">' + pcAv(r.c) + '<div class="pc-who-t"><b>' + esc(r.c.name) + (r.c.id === S.me.collaborator_id ? ' <small>moi</small>' : '') + '</b><span>' + esc(PC_KIND[r.c.kind] || '') + '</span>'
         + '<span class="pc-who-load"><b>' + E.fmtMin(r.load) + '</b>' + (r.cap ? ' / ' + E.fmtMin(r.cap) : '') + '<span class="lbl"> planifiées</span></span>' + (off && !r.load ? '' : pcBar(f, true) + '<span class="pc-who-f f-' + f.cls + '">' + esc(f.txt) + '</span>') + '</div></div>'
         + '<div class="pc-track" data-drop="' + d + '" data-dc="' + r.c.id + '">' + zones + (off ? '<span class="pc-off-l">' + esc(offLbl) + '</span>' : '') + ghost + shown.map(i => i.segs.map((sg, k) => pcBlock(i, d, h0, span, sg, k, i.segs.length)).join('')).join('') + '</div></div>';
@@ -3246,6 +3256,7 @@
       sets.late.length && ['late', 'alert', 'r', 'En retard', sets.late.length],
       sets.soon.length && ['soon', 'flag', 'o', 'Échéances dans les ' + cfg().due_soon_days + ' jours', sets.soon.length],
       sets.info.length && ['info', 'mail', 'o', 'Demandes d\'infos à faire', sets.info.length],
+      sets.wait.length && (() => { const ps = [...new Set(sets.wait.map(t => t.production_id))].map(id => S.data.productions.get(id)).filter(Boolean), due = ps.filter(p => (waitStage(p) || {}).due).length; return ['wait', 'clock', due ? 'r' : 'o', 'En attente client' + (due ? ' · ' + due + ' relance' + (due > 1 ? 's' : '') + ' à faire' : ''), ps.length]; })(), // V26.206
       sets.tvatodo.length && ['tvatodo', 'file', 'o', 'TVA à déposer (tenue terminée)', sets.tvatodo.length],
       sets.recv.length && ['recv', 'inbox', 'b', 'Éléments attendus', sets.recv.length]
     ].filter(Boolean);
@@ -3348,6 +3359,142 @@
     visibleCollabs().forEach(c => { let f = 0; dates.forEach(d => { const cap = E.capacityOn(c, d, x), l = E.loadOf(all, c.id, d).total; if (l > 0 && overAlert(l, cap)) over++; f += Math.max(0, cap - l); }); if (f >= 60) free++; });
     return { over, free, days: dates.length };
   }
+  /* ==========================================================================
+   * V26.206 — Fiabilité du planning
+   *  · « En attente du client » : un dossier bloqué sort du planning jusqu'à la réponse,
+   *    avec une cadence de relance (J+3, J+7, puis signalement au manager à J+10).
+   *    Stocké dans productions.filing.wait = { since, why, by } (aucune migration).
+   *  · Cause d'un retard, demandée en un clic à la clôture d'une tâche en retard
+   *    (historique « terminee », detail.cause) → Pareto dans Pilotage.
+   *  · Pilotage : attente client, délai de réponse des clients, causes des retards, écart prévu / réel.
+   * ========================================================================== */
+  const WAIT_WHY = { infos: 'Réponse à une demande d\'infos', pieces: 'Pièces manquantes', validation: 'Validation du client', autre: 'Autre blocage' };
+  const WAIT_STEPS = [[3, '1re relance'], [7, '2e relance'], [10, 'Signaler au manager']];
+  const LATE_CAUSES = [['pieces', 'Pièces du client tardives'], ['reponse', 'Réponse du client attendue'], ['planning', 'Planning trop rempli'], ['complexe', 'Plus complexe que prévu'], ['absence', 'Absence'], ['reprise', 'Erreur / reprise'], ['autre', 'Autre']];
+  const LATE_LABEL = Object.fromEntries(LATE_CAUSES);
+
+  const waitOf = p => (p && p.filing && p.filing.wait) || null;
+  /* Où en est l'attente : jours écoulés, relances faites depuis, prochaine étape et sa date */
+  function waitStage(p) {
+    const w = waitOf(p); if (!w) return null;
+    const td = today(), days = Math.max(0, E.daysBetween(w.since, td));
+    const rel = (S.relances || []).filter(r => r.client_id === p.client_id && r.month === p.month && r.date >= w.since).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const st = WAIT_STEPS[Math.min(rel.length, 2)], date = E.addDays(w.since, st[0]);
+    return { w, days, n: rel.length, last: rel[rel.length - 1] || null, label: st[1], date, due: td >= date, esc: rel.length >= 2 && td >= date };
+  }
+  const waitBadge = p => { const s = waitStage(p); return s ? '<span class="badge ' + (s.due ? 'r' : 'o') + '" title="' + esc(WAIT_WHY[s.w.why] || '') + '">' + ic('clock') + 'Attente client · ' + s.days + ' j</span>' : ''; };
+  const isLateNow = t => !t.done && t.kind !== 'info' && ((t.due_date && today() > t.due_date) || (t.planned_date && E.endDate(t) < today()));
+
+  async function setWait(pid, why) {
+    const p = S.data.productions.get(pid); if (!p || S.readonly || waitOf(p)) return;
+    const c = clientOf(p.client_id) || {}, ts = list('tasks').filter(t => t.production_id === pid && !t.done && t.kind !== 'info');
+    if (!ts.every(canEditTask)) { toast('Ce dossier ne fait pas partie de vos plannings.', 'warn'); return; }
+    const filing = Object.assign({}, p.filing || {}, { wait: { since: today(), why: why || 'autre', by: meName() || '' } });
+    const r = await saveUpdate('productions', pid, { filing }, { history: { action: 'attente', entity: 'production', entity_id: pid, client_id: p.client_id, detail: { why, text: 'En attente du client — ' + (WAIT_WHY[why] || '') } } });
+    if (r !== 'ok') return;
+    const out = ts.filter(t => t.planned_date || t.locked);
+    if (out.length) await saveMany('tasks', out.map(t => ({ id: t.id, patch: { planned_date: null, seq: 0, alloc: null, locked: false } })));
+    loadRelances();
+    toast(c.name + ' : en attente du client, retiré du planning. 1re relance prévue le ' + fDM(E.addDays(today(), WAIT_STEPS[0][0])) + '.', 'ok', null, 5000);
+  }
+  async function endWait(pid) {
+    const p = S.data.productions.get(pid), w = waitOf(p); if (!w || S.readonly) return;
+    const c = clientOf(p.client_id) || {}, td = today(), days = Math.max(0, E.daysBetween(w.since, td));
+    const filing = Object.assign({}, p.filing); delete filing.wait;
+    const r = await saveUpdate('productions', pid, { filing }, { history: { action: 'attente_fin', entity: 'production', entity_id: pid, client_id: p.client_id, detail: { why: w.why, since: w.since, to: td, days, text: 'Réponse du client reçue après ' + days + ' j' } } });
+    if (r !== 'ok') return;
+    if (S.fiab) S.fiab.waits.push({ client_id: p.client_id, days, to: td });
+    await applyPlan(runPlan(p.month, 'incremental', new Set([pid])));
+    const t = list('tasks').filter(x => x.production_id === pid && !x.done && x.kind !== 'info' && x.planned_date).sort((a, b) => a.planned_date.localeCompare(b.planned_date))[0];
+    toast(c.name + ' : dossier repris' + (t ? ', replanifié le ' + fDM(t.planned_date) : ' — aucune place trouvée, il est « à affecter »') + '.', t ? 'ok' : 'warn', null, 5000);
+  }
+
+  /* Encadré des fiches dossier / tâche */
+  function waitBox(p) {
+    if (!p) return '';
+    const ts = list('tasks').filter(t => t.production_id === p.id && t.kind !== 'info');
+    if (!ts.length || ts.every(t => t.done)) return '';
+    const edit = !S.readonly && ts.every(canEditTask), s = waitStage(p);
+    if (!s) {
+      if (!edit) return '';
+      return '<div class="ir-box wait-box"><div class="t">' + ic('clock', 'sm') + 'Bloqué par le client ?</div>'
+        + (S.waitPick === p.id ? '<div class="ir">' + Object.keys(WAIT_WHY).map(k => '<button data-act="wait-set" data-pid="' + p.id + '" data-why="' + k + '">' + esc(WAIT_WHY[k]) + '</button>').join('') + '</div><span class="small muted">Le dossier sort du planning jusqu\'à la réponse. Relances proposées à J+3 et J+7, puis signalement au manager.</span>'
+          : '<div class="row"><button class="btn sm" data-act="wait-pick" data-pid="' + p.id + '">' + ic('clock', 'sm') + 'Mettre en attente du client</button></div>') + '</div>';
+    }
+    if (!S.relancesLoaded) loadRelances().then(() => { if (S.sheet) renderSheet(); });
+    const step = s.esc ? '<span class="badge r">' + ic('alert') + 'À signaler au manager (depuis le ' + fDM(s.date) + ')</span>'
+      : '<span class="badge ' + (s.due ? 'r' : '') + '">' + ic(s.due ? 'alert' : 'calendar') + s.label + (s.due ? ' à faire' + (s.date < today() ? ' (prévue le ' + fDM(s.date) + ')' : ' aujourd\'hui') : ' le ' + fDM(s.date)) + '</span>';
+    return '<div class="ir-box wait-box on"><div class="t">' + ic('clock', 'sm') + 'En attente du client depuis ' + (s.days ? s.days + ' jour' + (s.days > 1 ? 's' : '') : 'aujourd\'hui') + '</div>'
+      + '<div class="small">' + esc(WAIT_WHY[s.w.why] || 'Blocage') + ' · ' + (s.n ? s.n + ' relance' + (s.n > 1 ? 's' : '') + ', la dernière ' + relLabel(s.last) : 'aucune relance') + '</div>'
+      + '<div class="row" style="margin-top:6px">' + step + '</div>'
+      + (edit ? '<div class="row" style="margin-top:8px"><button class="btn sm" data-act="wait-rel" data-pid="' + p.id + '" data-via="mail">' + ic('mail', 'sm') + 'Relancé par e-mail</button><button class="btn sm" data-act="wait-rel" data-pid="' + p.id + '" data-via="tel">' + ic('phone', 'sm') + 'Relancé par tél.</button><button class="btn sm primary" data-act="wait-end" data-pid="' + p.id + '">' + ic('check', 'sm') + 'Réponse reçue — reprendre</button></div>' : '')
+      + '</div>';
+  }
+
+  /* Choix de la cause d'un retard (fenêtre « Terminer ») */
+  const causeChips = () => '<div class="fd-cause"><div class="small muted" style="margin-bottom:8px"><b style="color:var(--text)">Cette tâche est en retard : pourquoi ?</b> <span>— un clic, pour comprendre où agir</span></div><div class="ir">'
+    + LATE_CAUSES.map(c => '<button type="button" data-cause="' + c[0] + '">' + esc(c[1]) + '</button>').join('') + '</div></div>';
+  /* Dossier terminé d'un coup (plusieurs tâches) : même question, dans une petite fenêtre */
+  function askCause(c) {
+    return new Promise(resolve => {
+      const root = document.createElement('div');
+      root.className = 'overlay anim center';
+      root.innerHTML = '<div class="sheet" role="dialog" aria-modal="true" style="width:min(460px,100%)"><div class="sheet-h"><div style="margin-right:auto"><h2>Retard — ' + esc((c && c.name) || 'dossier') + '</h2></div></div><div class="sheet-b">' + causeChips() + '</div><div class="sheet-f"><button class="btn" data-cause="">Passer</button></div></div>';
+      root.addEventListener('click', e => { const b = e.target.closest('[data-cause]'); if (!b && e.target !== root) return; fxClose(root); resolve(b ? b.dataset.cause || null : null); });
+      document.body.appendChild(root);
+    });
+  }
+
+  /* Historique utile au Pilotage (chargé une fois) */
+  async function loadFiab() {
+    if (S.fiab || !S.store.loadHistory) return;
+    S.fiab = { waits: [], causes: [] };
+    try {
+      const [a, b] = await Promise.all([S.store.loadHistory({ limit: 1000, action: 'attente_fin' }), S.store.loadHistory({ limit: 3000, action: 'terminee' })]);
+      a.forEach(x => { const d = x.detail || {}; if (x.client_id && d.days !== undefined) S.fiab.waits.push({ client_id: x.client_id, days: Number(d.days) || 0, to: d.to || atDay(x.at) }); });
+      b.forEach(x => { const d = x.detail || {}; if (d.cause) S.fiab.causes.push({ cause: d.cause, at: atDay(x.at), client_id: x.client_id }); });
+    } catch (e) { /* sans historique : indicateurs vides */ }
+    scheduleRender();
+  }
+  const noteCause = (t, cause) => { if (cause && S.fiab) S.fiab.causes.push({ cause, at: today(), client_id: t.client_id }); };
+
+  /* ---------- Pilotage : fiabilité du planning ---------- */
+  function fiabSection(m) {
+    loadFiab();
+    const td = today(), F = S.fiab || { waits: [], causes: [] }, vis = new Set(scopedData().clients.map(c => c.id));
+    // 1. Dossiers en attente du client
+    const waiting = list('productions').filter(p => waitOf(p) && vis.has(p.client_id)).map(p => ({ p, s: waitStage(p), c: clientOf(p.client_id) || {} })).sort((a, b) => b.s.days - a.s.days);
+    const relDue = waiting.filter(x => x.s.due).length;
+    const y1 = E.addDays(td, -365), ws = F.waits.filter(w => w.to >= y1 && vis.has(w.client_id));
+    const avg = ws.length ? ws.reduce((s, w) => s + w.days, 0) / ws.length : null;
+    const byC = new Map(); ws.forEach(w => { const o = byC.get(w.client_id) || { n: 0, d: 0 }; o.n++; o.d += w.days; byC.set(w.client_id, o); });
+    const slow = [...byC.entries()].map(([id, o]) => ({ c: clientOf(id) || { name: '?' }, avg: o.d / o.n, n: o.n })).sort((a, b) => b.avg - a.avg).slice(0, 5);
+    const f1 = n => (Math.round(n * 10) / 10).toString().replace('.', ',');
+    const wait = '<div class="card anim-in fb-card"><div class="card-h"><h2>' + ic('clock', 'sm') + ' Attente client</h2>' + (waiting.length ? '<span class="badge ' + (relDue ? 'r' : 'o') + '">' + waiting.length + ' dossier' + (waiting.length > 1 ? 's' : '') + '</span>' : '') + '</div>'
+      + (waiting.length ? '<div class="fb-list">' + waiting.slice(0, 8).map(x => '<button class="fb-row" data-act="client" data-id="' + x.c.id + '"><b>' + esc(x.c.name) + '</b><span class="small muted">' + esc(WAIT_WHY[x.s.w.why] || '') + ' · ' + x.s.n + ' relance' + (x.s.n > 1 ? 's' : '') + '</span><span class="badge ' + (x.s.esc ? 'r' : x.s.due ? 'o' : '') + '">' + (x.s.esc ? 'À signaler' : x.s.due ? x.s.label + ' à faire' : x.s.days + ' j') + '</span></button>').join('') + '</div>' + (waiting.length > 8 ? '<p class="small muted">+ ' + (waiting.length - 8) + ' autre(s)</p>' : '')
+        : '<div class="pc-c-empty">' + ic('check', 'sm') + 'Aucun dossier bloqué par un client.</div>')
+      + '<div class="fb-sub"><div class="fb-big"><b>' + (avg === null ? '—' : f1(avg) + ' j') + '</b><span>délai moyen de réponse des clients' + (ws.length ? ' (' + ws.length + ' attente' + (ws.length > 1 ? 's' : '') + ', 12 mois)' : '') + '</span></div>'
+      + (slow.length ? '<div class="fb-slow">' + slow.map(x => '<div><span>' + esc(x.c.name) + '</span><b>' + f1(x.avg) + ' j</b></div>').join('') + '</div>' : '<p class="small muted" style="margin:6px 0 0">Il se calcule à chaque « Réponse reçue — reprendre ».</p>') + '</div></div>';
+    // 2. Causes des retards (90 derniers jours) — Pareto
+    const d90 = E.addDays(td, -90), cs = F.causes.filter(x => x.at >= d90 && (!x.client_id || vis.has(x.client_id))), tot = cs.length;
+    const cnt = LATE_CAUSES.map(c => ({ k: c[0], l: c[1], n: cs.filter(x => x.cause === c[0]).length })).filter(x => x.n).sort((a, b) => b.n - a.n);
+    let cum = 0;
+    const par = '<div class="card anim-in fb-card"><div class="card-h"><h2>' + ic('alert', 'sm') + ' Causes des retards</h2><span class="small muted">90 derniers jours</span></div>'
+      + (tot ? '<div class="fb-par">' + cnt.map(x => { cum += x.n; return '<div class="fb-bar"><span class="l">' + esc(x.l) + '</span><span class="b"><i style="width:' + (x.n / cnt[0].n * 100).toFixed(1) + '%"></i></span><b>' + x.n + '</b><span class="cum small muted">' + Math.round(cum / tot * 100) + ' %</span></div>'; }).join('') + '</div>'
+        + '<p class="small muted" style="margin:8px 0 0">' + tot + ' retard' + (tot > 1 ? 's' : '') + ' expliqué' + (tot > 1 ? 's' : '') + '. Agir d\'abord sur les premières lignes : elles cumulent l\'essentiel.</p>'
+        : '<div class="pc-c-empty">' + ic('check', 'sm') + 'Aucune cause notée pour l\'instant : elle est demandée à la clôture d\'une tâche en retard.</div>')
+      + fbGap(m) + '</div>';
+    return '<div class="section-t"><h2>Fiabilité du planning</h2></div><div class="split fb-split">' + wait + par + '</div>';
+  }
+  /* Écart entre temps prévu et temps réel, par type, sur les tâches terminées du mois */
+  function fbGap(m) {
+    const vis = new Set(scopedData().collaborators.map(c => c.id));
+    const ts = list('tasks').filter(t => t.month === m && t.done && Number(t.actual_min) > 0 && Number(t.duration_min) > 0 && vis.has(t.collaborator_id));
+    if (!ts.length) return '';
+    const rows = E.KINDS.map(k => { const xs = ts.filter(t => t.kind === k); if (!xs.length) return null; const p = xs.reduce((s, t) => s + Number(t.duration_min), 0), a = xs.reduce((s, t) => s + Number(t.actual_min), 0); return { k, n: xs.length, p, a, g: Math.round((a - p) / p * 100) }; }).filter(Boolean);
+    return '<div class="fb-gap"><div class="small muted" style="margin:12px 0 6px"><b style="color:var(--text)">Temps prévu / temps réel</b> — ' + esc(fMonth(m)) + ', ' + ts.length + ' tâche' + (ts.length > 1 ? 's' : '') + ' terminée' + (ts.length > 1 ? 's' : '') + '</div>'
+      + rows.map(r => '<div class="fb-g"><span>' + esc(E.KIND_LABEL[r.k]) + ' <em class="small muted">(' + r.n + ')</em></span><span class="small muted">' + E.fmtMin(r.p) + ' → ' + E.fmtMin(r.a) + '</span><b class="' + (r.g > 10 ? 'bad' : r.g < -10 ? 'good' : '') + '">' + (r.g > 0 ? '+' : '') + r.g + ' %</b></div>').join('') + '</div>';
+  }
   /* ---------- Vue TABLEAU DE BORD ---------- */
   /* ====================== V26.45 : synthèse hebdomadaire du manager (règles, sans IA générative) ======================
    * Phrases construites à partir des données : avancement, réceptions, échéances, surcharges prévues, marges, aide, absences. */
@@ -3425,6 +3572,7 @@
   }
   function vDashboard() {    const m = S.month, td = today(), x = ctx(), db = E.dashboard(scopedData(), m, td), al = alertsOf(scopedData(), td, { month: m });
     const Pr = db.productions, L = db.load, tot = Pr.total || 1, tasks = list('tasks');
+    db.unplanned = db.unplanned.filter(t => t.kind === 'info' || !waitOf(S.data.productions.get(t.production_id))); // V26.206 : l'attente client n'est pas un manque de place
     const pct = (a, b) => (b ? Math.round(a / b * 100) : 0);
     const sparks = dashSparks(m);
     const kp = (i, icon, box, label, val, fmt, key, foot, extra) => '<div class="kpi anim-in' + (extra || '') + (key.indexOf('dp-') === 0 ? ' kpi-click' : '') + '" style="--i:' + i + '"' + (key.indexOf('dp-') === 0 ? ' data-act="prod-detail" data-k="' + key + '" role="button" tabindex="0"' : '') + '><div class="kpi-h"><span class="ibox ' + box + '">' + ic(icon, 'sm') + '</span>' + label + '</div><div class="v" data-count="' + val + '" data-fmt="' + fmt + '" data-key="' + key + m + '">' + fmtVal(val, fmt) + '</div><div class="foot">' + foot + '</div>' + (sparks[key] || '') + '</div>';
@@ -3473,7 +3621,7 @@
       + capSection() + riskSection(m) + helpSection() + postponeSection() + '<div class="split" style="margin-top:var(--gap)">'
       + (db.unplanned.length ? '<div class="frame anim-in"><div class="frame-h">' + ic('alert') + '<h2>Tâches non planifiées</h2><span class="badge r">' + db.unplanned.length + '</span></div><div class="inner"><div class="tasks">' + db.unplanned.slice(0, 20).map(t => taskRow(t, { showCollab: true, swipe: false })).join('') + '</div></div></div>' : '<div class="frame anim-in"><div class="frame-h">' + ic('check') + '<h2>Planification</h2></div><div class="inner"><div class="empty">Toutes les tâches du mois sont planifiées.</div></div></div>')
       + '<div class="frame anim-in"><div class="frame-h">' + ic('alert') + '<h2>Alertes</h2><span class="badge' + (al.some(a => a.level === 'bad') ? ' r' : '') + '">' + al.length + '</span></div><div class="inner">' + alertList(al, 12) + '</div></div>'
-      + '</div>' : '')
+      + '</div>' + fiabSection(m) : '')
       + (act ? '<div class="section-t"><h2>Niveau d\'activité</h2><span class="legend d-only"><span><i class="lg-sw hatch"></i>Jours passés</span><span><i class="lg-sw" style="background:var(--pop)"></i>Aujourd\'hui</span><span><i class="lg-sw vb-fut"></i>À venir</span><span><i class="lg-sw" style="background:var(--bad)"></i>Surcharge</span><span><i class="lg-sw" style="background:var(--track)"></i>Capacité</span></span></div>'
       + '<div class="split">'
       + '<div class="card anim-in" style="--i:5"><div class="card-h"><h2>Niveau d\'activité de l\'équipe par jour</h2><span class="badge">' + E.fmtMin(L.total) + ' planifiées</span></div><div class="vbars">' + (bars || '<div class="empty" style="width:100%">Les dossiers du mois ne sont pas encore créés.</div>') + '</div></div>'
@@ -3783,6 +3931,7 @@
       + num('annual_month', 'Mois des dossiers annuels', st.annual_month, 1, 12) + '</div><div class="row" style="margin-top:12px">'
       + chk('holidays', 'Jours fériés = non travaillés', st.holidays) + chk('auto_lock_on_move', 'Verrouiller automatiquement une tâche déplacée à la main', st.auto_lock_on_move) + '</div>'
       + '<div class="form" style="margin-top:14px"><label class="f"><span>Durée d\'une demande d\'informations (planning)</span><input type="text" data-ch="setting" data-k="info_request_min" value="' + E.fmtMin(st.info_request_min || 45) + '"></label>' + num('alert_from_day', 'Alerte « ne tiendra pas le ' + st.end_day + ' » à partir du', st.alert_from_day, 1, 28) + '</div><div class="row" style="margin-top:12px">' + chk('auto_create_month', 'Créer automatiquement les dossiers du mois en cours et du mois suivant (planning prospectif)', st.auto_create_month) + '</div>'
+      + '<div class="form" style="margin-top:14px">' + num('reserve_pct', 'Temps réservé aux imprévus (% de la journée)', st.reserve_pct, 0, 60) + '</div><p class="small muted" style="margin:6px 0 0">Appels, mails, questions internes : cette part de chaque journée n\'est jamais planifiée (20 % conseillé). Réglable aussi par personne, dans sa fiche.</p>'
       + '<div class="form" style="margin-top:14px">' + num('freeze_days', 'Zone figée : aujourd\'hui + jours ouvrés', st.freeze_days, 0, 5) + '</div><p class="small muted" style="margin:6px 0 0">Dans la zone figée, un dossier reçu déjà planifié n\'est pas déplacé quand un autre dossier arrive (sauf « Forcer » lors d\'une replanification).</p>'
       + '<div class="row" style="margin-top:12px">' + chk('agent_enabled', 'Agent de planification : apprend des mois précédents et ajuste les dates de réception prévues', st.agent_enabled) + '</div></div>'
       + '<div class="card"><div class="card-h"><h2>Historique pour l\'agent</h2><span class="small muted">' + S.data.learning_history.size + ' ligne(s) importée(s)</span></div>'
@@ -3969,7 +4118,7 @@
       + (lk ? '<div class="notice info">Tâche verrouillée : la replanification automatique ne modifie ni sa date, ni son collaborateur, ni sa durée. Déverrouillez pour la modifier.' + (edit && !S.readonly ? ' <button class="btn sm primary" data-act="lock" data-id="' + t.id + '" style="margin-left:8px">' + ic('lock', 'sm') + 'Déverrouiller</button>' : '') + '</div>' : '')
       + (!edit ? '<div class="notice">Lecture seule : cette tâche n\'est pas attribuée à votre collaborateur.</div>' : '')
       + '<div class="frame"><div class="frame-h">' + ic('route', 'sm') + '<h2>Parcours du dossier</h2></div><div class="inner">' + prodTimeline(p) + '</div></div>'
-      + predictBox(p, t, c) + irBox(p) + filingBox(p) + (t.done && t.actual_min ? '<div class="notice ok">Temps réel : <b>' + E.fmtMin(t.actual_min) + '</b> (prévu ' + E.fmtMin(t.duration_min) + ')</div>' : '')
+      + predictBox(p, t, c) + irBox(p) + waitBox(p) + filingBox(p) + (t.done && t.actual_min ? '<div class="notice ok">Temps réel : <b>' + E.fmtMin(t.actual_min) + '</b> (prévu ' + E.fmtMin(t.duration_min) + ')</div>' : '')
       + '<div class="form"><label class="f"><span>Date planifiée</span><input type="date" data-ch="t-date" data-id="' + t.id + '" value="' + (t.planned_date || '') + '"' + dis + '></label>'
       + '<label class="f"><span>Collaborateur</span><select data-ch="t-collab" data-id="' + t.id + '"' + (canEditTask(t) && !lk && !t.done ? '' : ' disabled') + '><option value="">—</option>' + collabs(true).filter(x => isAdmin() || canSeeCollab(x.id) || x.id === t.collaborator_id).map(x => '<option value="' + x.id + '"' + (x.id === t.collaborator_id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></label>'
       + '<label class="f"><span>Durée prévue</span><input type="text" data-ch="t-dur" data-id="' + t.id + '" value="' + E.fmtMin(t.duration_min) + '"' + dis + '></label></div>'
@@ -4002,7 +4151,7 @@
       + '<label class="f"><span>Particularités</span><textarea data-ch="c-field" data-k="notes"' + ro + '>' + esc(c.notes || '') + '</textarea></label>'
       + (!isNew ? '<label class="cb"><input type="checkbox" data-ch="c-field" data-k="active"' + (c.active !== false ? ' checked' : '') + ro + '> Dossier actif <span class="small muted">— décocher pour griser le dossier et l\'exclure de la planification</span></label>' + (c.active === false ? '<div class="notice warn">Dossier inactif : il est grisé et n\'est plus pris en compte dans la planification ni dans les indicateurs. Recochez « Dossier actif » pour le réintégrer.</div>' : '') : '')
       + (!isNew ? '<div class="card" style="box-shadow:none"><div class="card-h"><h3 class="cap">' + fMonth(m) + '</h3>' + (p ? '<span>' + esc(prodLine(p)) + '</span>' : '') + '</div>'
-        + (p ? '<div class="row" style="margin-bottom:10px">' + (p.received_date ? '<button class="btn sm" data-act="rec-undo" data-id="' + p.id + '">Annuler la réception</button>' : (p.expected_date < today() ? '<button class="btn icon sm rl-btn" data-act="relance" data-pid="' + p.id + '" title="Texte de relance à copier" aria-label="Relancer le client">' + ic('mail', 'sm') + '</button><button type="button" class="btn icon sm rl-btn rl-tel" data-act="relance-tel" data-pid="' + p.id + '" title="Client relancé par téléphone : noter la relance" aria-label="Client relancé par téléphone">' + ic('phone', 'sm') + '</button>' : '') + '<button class="btn sm primary" data-act="rec-one" data-id="' + p.id + '">📥 Éléments reçus aujourd\'hui</button>' + (S.v7 ? '<button class="btn sm" data-act="rec-part" data-id="' + p.id + '">◐ Réception partielle</button>' : '')) + '</div>' + irBox(p) + filingBox(p) + '<div class="tasks" style="margin-top:12px">' + (ts.map(t => taskRow(t, { showDate: true, showCollab: true })).join('') || '<div class="empty">Aucune tâche (temps à 0).</div>') + '</div>' : '<div class="empty">Ce dossier n\'est pas encore créé pour ce mois.</div>') + '</div>'
+        + (p ? '<div class="row" style="margin-bottom:10px">' + (p.received_date ? '<button class="btn sm" data-act="rec-undo" data-id="' + p.id + '">Annuler la réception</button>' : (p.expected_date < today() ? '<button class="btn icon sm rl-btn" data-act="relance" data-pid="' + p.id + '" title="Texte de relance à copier" aria-label="Relancer le client">' + ic('mail', 'sm') + '</button><button type="button" class="btn icon sm rl-btn rl-tel" data-act="relance-tel" data-pid="' + p.id + '" title="Client relancé par téléphone : noter la relance" aria-label="Client relancé par téléphone">' + ic('phone', 'sm') + '</button>' : '') + '<button class="btn sm primary" data-act="rec-one" data-id="' + p.id + '">📥 Éléments reçus aujourd\'hui</button>' + (S.v7 ? '<button class="btn sm" data-act="rec-part" data-id="' + p.id + '">◐ Réception partielle</button>' : '')) + '</div>' + irBox(p) + waitBox(p) + filingBox(p) + '<div class="tasks" style="margin-top:12px">' + (ts.map(t => taskRow(t, { showDate: true, showCollab: true })).join('') || '<div class="empty">Aucune tâche (temps à 0).</div>') + '</div>' : '<div class="empty">Ce dossier n\'est pas encore créé pour ce mois.</div>') + '</div>'
         + histBlock(s, { client_id: c.id }) : '')
       + '</div><div class="sheet-f">' + (isNew ? '<button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="client-create">Créer le dossier</button>' : (isManager() ? '<button class="btn danger" data-act="client-del" data-id="' + c.id + '">Supprimer</button><span class="spacer"></span>' : '') + '<span class="small muted">Enregistrement automatique</span><button class="btn" data-act="close">Fermer</button>') + '</div>';
   }
@@ -4028,6 +4177,8 @@
     return sheetHead(isNew ? 'Nouveau collaborateur' : esc(c.name))
       + '<div class="sheet-b">' + remoteNotice(s) + '<div class="form"><label class="f"><span>Nom</span><input type="text" data-ch="co-field" data-k="name" value="' + esc(c.name || '') + '"></label>'
       + '<label class="f"><span>Heures disponibles par jour</span><input type="text" data-ch="co-field" data-k="daily_capacity_min" value="' + E.fmtMin(c.daily_capacity_min) + '"></label>'
+      + (!isNew && (isManager() || isAdmin()) ? (() => { const by = cfg().reserve_by || {}, own = by[c.id] !== undefined && by[c.id] !== null && by[c.id] !== '', r = E.reserveOf(c, cfg()); // V26.206 : réserve pour imprévus propre à la personne
+        return '<label class="f"><span>Temps réservé aux imprévus</span><select data-ch="co-reserve"' + (S.readonly ? ' disabled' : '') + '><option value=""' + (own ? '' : ' selected') + '>Comme le cabinet (' + (Number(cfg().reserve_pct) || 0) + ' %)</option>' + [0, 10, 15, 20, 25, 30, 35, 40].map(v => '<option value="' + v + '"' + (own && Number(by[c.id]) === v ? ' selected' : '') + '>' + v + ' %</option>').join('') + '</select><em class="small muted">soit ' + E.fmtMin(Math.round((Number(c.daily_capacity_min) || 0) * (1 - r / 100))) + ' planifiables par jour</em></label>'; })() : '')
       + '<label class="f"><span>Couleur</span><input type="color" data-ch="co-field" data-k="color" value="' + esc(c.color || '#2f6fd0') + '" style="min-height:38px;width:100%"></label>'
       + (S.v8 ? '<label class="f"><span>Fonction</span><select data-ch="co-field" data-k="kind"' + (isAdmin() ? '' : ' disabled') + '><option value="collab"' + (c.kind !== 'rc' && c.kind !== 'apprenti' ? ' selected' : '') + '>Collaborateur comptable</option><option value="rc"' + (c.kind === 'rc' ? ' selected' : '') + '>Responsable client (RC)</option>' + (v17() ? '<option value="apprenti"' + (c.kind === 'apprenti' ? ' selected' : '') + '>Apprenti</option>' : '') + '</select></label>'
         + '<label class="f"><span>Équipe</span><select data-ch="co-field" data-k="team_id"' + (isAdmin() ? '' : ' disabled') + '><option value="">—</option>' + list('teams').sort(byName).map(tm => '<option value="' + tm.id + '"' + (tm.id === c.team_id ? ' selected' : '') + '>' + esc(tm.name) + '</option>').join('') + '</select></label>'
@@ -4093,6 +4244,7 @@
   }
   async function moveTask(t, date, toCollab) {
     if (!canEditTask(t) || t.locked || t.done) return;
+    if (date && t.kind !== 'info' && waitOf(S.data.productions.get(t.production_id))) { toast((clientOf(t.client_id) || {}).name + ' est en attente du client : cliquez « Réponse reçue — reprendre » dans sa fiche avant de le planifier.', 'warn', null, 5000); return; } // V26.206
     if (date && !E.isWorkday(date)) { const nd = E.nextWorkday(date); toast(fDate(date) + (E.holidayName(date) ? ' est férié (' + E.holidayName(date) + ')' : ' est un week-end') + ' : déplacé au ' + fDate(nd) + '.', 'warn', null, 4000); date = nd; }
     // V26.74 : glisser-déposer entre le planning du tuteur et celui de son apprenti
     const who = toCollab && toCollab !== t.collaborator_id && canSeeCollab(toCollab) ? toCollab : t.collaborator_id;
@@ -4120,11 +4272,11 @@
     alloc[td] = Math.max(0, (Number(t.duration_min) || 0) - used);
     return { planned_date: t.planned_date, alloc: Object.keys(alloc).length > 1 ? alloc : null };
   }
-  async function toggleDone(t, extra) {
+  async function toggleDone(t, extra, meta) {
     if (!canEditTask(t)) return;
     const td = today();
     const patch = t.done ? { done: false, done_at: null, actual_min: null } : Object.assign({ done: true, done_at: nowStamp() }, doneSpan(t, td), extra || {});
-    const r = await saveUpdate('tasks', t.id, patch, { history: { action: t.done ? 'reouverte' : 'terminee', entity: 'task', entity_id: t.id, client_id: t.client_id, detail: { kind: t.kind, text: !t.done && t.planned_date && t.planned_date > td ? 'prévue le ' + fDMY(t.planned_date) + ', réalisée le ' + fDMY(td) : '' } } });
+    const r = await saveUpdate('tasks', t.id, patch, { history: { action: t.done ? 'reouverte' : 'terminee', entity: 'task', entity_id: t.id, client_id: t.client_id, detail: { kind: t.kind, cause: (!t.done && meta && meta.cause) || undefined, text: !t.done && t.planned_date && t.planned_date > td ? 'prévue le ' + fDMY(t.planned_date) + ', réalisée le ' + fDMY(td) : '' } } });
     if (r === 'ok') {
       syncProdStatus(t.production_id);
       if (patch.done) { S.justDone.add(t.id); scheduleRender(); setTimeout(() => S.justDone.delete(t.id), 900); }
@@ -5495,6 +5647,10 @@
     'done-group': (el, e) => { e.stopPropagation(); finishGroup(groupFromKey(el.dataset.key)); },
     'lock-group': el => lockGroup(groupFromKey(el.dataset.key)),
     'ir-list': el => openSheet({ type: 'irList', wide: true, ids: (el.dataset.ids || '').split(',').filter(Boolean) }), // V26.197
+    'wait-pick': el => { S.waitPick = el.dataset.pid; renderSheet(); }, // V26.206 : en attente du client
+    'wait-set': el => { S.waitPick = null; setWait(el.dataset.pid, el.dataset.why).then(() => { if (S.sheet) renderSheet(); }); },
+    'wait-end': el => endWait(el.dataset.pid).then(() => { if (S.sheet) renderSheet(); }),
+    'wait-rel': el => { if (el.dataset.via === 'tel') relanceTel(el.dataset.pid); else relanceMail(el.dataset.pid); },
     ir: el => setInfoRequest(el.dataset.pid, el.dataset.v).then(r => { if (r === 'ok') toast(IR_LABEL[el.dataset.v] + ' — enregistré.', 'ok', null, 2500); }),
     lock: el => { const t = S.data.tasks.get(el.dataset.id); if (t) toggleLock(t); },
     alert: el => {
@@ -5638,6 +5794,11 @@
       const u = S.data.app_users.get(s.id); if (!u) return;
       if (await setUserStart(u.email, el.value)) toast('Début d\'utilisation de ' + u.name + ' : ' + (el.value ? fMonth(el.value) : 'comme le cabinet') + '.', 'ok', null, 3000);
     },
+    'co-reserve': async el => { // V26.206 : réserve pour imprévus d'une personne (vide = comme le cabinet)
+      const s = S.sheet, c = s && S.data.collaborators.get(s.id); if (!c) return;
+      const by = Object.assign({}, cfg().reserve_by || {}); if (el.value === '') delete by[c.id]; else by[c.id] = Number(el.value);
+      if (await savePlanning({ reserve_by: by }, c.name + ' : temps réservé aux imprévus ' + (el.value === '' ? 'comme le cabinet' : el.value + ' %'))) { renderSheet(); render(); toast('Imprévus de ' + c.name + ' : ' + (el.value === '' ? 'comme le cabinet' : el.value + ' %') + '. « Replanifier le mois » l\'applique aux dossiers déjà placés.', 'ok', null, 5000); }
+    },
     setting: el => {
       const k = el.dataset.k; let v = el.type === 'checkbox' ? el.checked : el.value;
       if (el.type === 'number') v = Number(v);
@@ -5647,6 +5808,7 @@
       const cur = S.data.settings.get('planning');
       const value = Object.assign({}, cfg(), { [k]: v });
       if (value.start_day >= value.end_day) { toast('Le début de période doit précéder la fin.', 'warn'); render(); return; }
+      if (k === 'reserve_pct') { v = Math.min(60, Math.max(0, Number(v) || 0)); setTimeout(() => toast('Temps réservé aux imprévus : ' + v + ' %. « Replanifier le mois » l\'applique aux dossiers déjà placés.', 'ok', null, 5000), 300); }
       if (k === 'info_request_min' && isManager()) setTimeout(() => toast('Durée des demandes d\'informations mise à jour : elle s\'applique aux nouvelles demandes.', 'ok', null, 5000), 300);
       if (cur) saveUpdate('settings', 'planning', { value }, { history: { action: 'parametres', detail: { text: k + ' = ' + JSON.stringify(v) } } }).then(r => { if (r === 'ok' && k === 'agent_enabled' && v) runAgent().then(() => render()); });
       else saveInsert('settings', [{ id: 'planning', value }]).catch(() => { });
