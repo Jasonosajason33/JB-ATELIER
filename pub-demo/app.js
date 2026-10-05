@@ -544,7 +544,8 @@
   }
   // V26.62 : onglets en haut des pages du Pilotage (manager)
   const PILOT_TABS = [['dashboard', 'Vue d\'ensemble'], ['activite', 'Équipe & activité'], ['previsions', 'Prévisions & agent'], ['kpi', 'Indicateurs']];
-  const pilotTabs = () => isManager() ? '<div class="seg pilot-tabs" role="tablist">' + PILOT_TABS.map(t => '<button role="tab" class="' + (S.route === t[0] ? 'on' : '') + '" data-act="go-route" data-r="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>' : '';
+  // V26.209 : le mois et les actions du mois (ex. « Replanifier le mois ») se placent sur la ligne des onglets
+  const pilotTabs = right => { const tabs = isManager() ? '<div class="seg pilot-tabs" role="tablist">' + PILOT_TABS.map(t => '<button role="tab" class="' + (S.route === t[0] ? 'on' : '') + '" data-act="go-route" data-r="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>' : ''; return right ? '<div class="pilot-bar">' + tabs + '<span class="spacer"></span><div class="pilot-right">' + right + '</div></div>' : tabs; };
   // V26.175 : 4e thème « Iris » — clair, aéré, accent pervenche, animations premium (fichier design-iris.css)
   ICONS.drop = '<path d="M12 3.2c3.3 4.1 6 7.4 6 10.6a6 6 0 0 1-12 0c0-3.2 2.7-6.5 6-10.6z"/>';
   const THEMES = [['signature', 'Signature', 'sparkle'], ['clair', 'Clair', 'sun'], ['nuit', 'Aurora', 'moon'], ['iris', 'Iris', 'drop']];
@@ -3627,7 +3628,7 @@
     }).join('');
     const fillBox = L.fill > 100 ? 'r' : L.fill >= x.settings.warn_pct ? 'o' : 'g';
     const ov = S.route === 'dashboard', act = S.route === 'activite', prev = S.route === 'previsions'; // V26.61 : Pilotage réparti en 3 pages
-    return migNotice() + inactiveNotice() + pilotTabs() + teamPicker() + (ov ? synthSection() + milestoneBanner(m) : '') + '<div class="row" style="margin-bottom:6px">' + monthNav() + '<span class="spacer"></span>' + monthActions(m) + '</div>'
+    return migNotice() + inactiveNotice() + pilotTabs(monthNav() + monthActions(m)) + teamPicker() + (ov ? synthSection() + milestoneBanner(m) : '')
       + (ov ? '<div class="section-t"><h2>Production</h2></div>'
       + '<div class="carousel desk-grid" style="--n:5" data-keep="kpi-dash-p">'
       + kp(0, 'folder', '', 'Dossiers', Pr.total, 'int', 'dp-tot', Pr.received + ' reçus sur ' + Pr.total, ' hero')

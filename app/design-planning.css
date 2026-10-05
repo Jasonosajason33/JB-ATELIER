@@ -467,3 +467,14 @@ html:is([data-theme="signature"], [data-variant="aurora"], [data-theme="nuit"]) 
 .co-hours .co-h-row label { display: flex; flex-direction: column; gap: 3px; }
 .co-hours .co-h-row em { font-style: normal; font-size: 11px; color: var(--muted); text-align: center; }
 .co-hours .co-h-row input { text-align: center; padding-left: 4px; padding-right: 4px; min-width: 0; }
+
+/* V26.209 — survol d'une tâche dans une liste : l'anneau du curseur était coupé par le cadre de la ligne (.swipe, overflow caché)
+   et ne laissait voir qu'un trait sous la tâche. L'anneau est dessiné à l'intérieur. */
+html[data-cur="noir"] .tasks .swipe > .task:hover { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 85%, transparent) !important; border-color: transparent !important; }
+
+/* V26.209 — Pilotage : onglets, mois et « Replanifier le mois » sur une seule ligne */
+.pilot-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.pilot-bar .pilot-tabs { margin-bottom: 0; }
+.pilot-bar .pilot-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pilot-bar + .synth, .pilot-bar ~ .section-t:first-of-type { margin-top: 8px !important; }
+@media (max-width: 640px) { .pilot-bar .spacer { display: none; } .pilot-bar .pilot-right { width: 100%; justify-content: space-between; } }

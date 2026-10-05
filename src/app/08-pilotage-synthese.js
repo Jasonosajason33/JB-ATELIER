@@ -112,7 +112,7 @@
     }).join('');
     const fillBox = L.fill > 100 ? 'r' : L.fill >= x.settings.warn_pct ? 'o' : 'g';
     const ov = S.route === 'dashboard', act = S.route === 'activite', prev = S.route === 'previsions'; // V26.61 : Pilotage réparti en 3 pages
-    return migNotice() + inactiveNotice() + pilotTabs() + teamPicker() + (ov ? synthSection() + milestoneBanner(m) : '') + '<div class="row" style="margin-bottom:6px">' + monthNav() + '<span class="spacer"></span>' + monthActions(m) + '</div>'
+    return migNotice() + inactiveNotice() + pilotTabs(monthNav() + monthActions(m)) + teamPicker() + (ov ? synthSection() + milestoneBanner(m) : '')
       + (ov ? '<div class="section-t"><h2>Production</h2></div>'
       + '<div class="carousel desk-grid" style="--n:5" data-keep="kpi-dash-p">'
       + kp(0, 'folder', '', 'Dossiers', Pr.total, 'int', 'dp-tot', Pr.received + ' reçus sur ' + Pr.total, ' hero')
