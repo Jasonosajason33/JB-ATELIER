@@ -547,3 +547,28 @@ html[data-cur="noir"] .tasks .swipe > .task:hover { box-shadow: inset 0 0 0 1.5p
 .rec-scroll .rec input[type="checkbox"] { width: 18px; height: 18px; }
 #rec-gl .rec-got td { padding-top: 3px !important; padding-bottom: 3px !important; }
 @media (max-width: 640px) { .card-h .rec-q { flex: 1 1 100%; order: 3; } }
+
+/* V26.213 — Réceptions : 10 lignes visibles, lignes encore 20 % plus basses, barre de défilement discrète
+   (fin trait de 4 px, invisible au repos, qui apparaît au survol de la liste) */
+#rec-wl { max-height: calc(10 * 40px); }
+#rec-gl { max-height: calc(10 * 33px); }
+#rec-wl.rec-list { gap: 4px !important; }
+.rec-scroll > .rec { padding-top: 0 !important; padding-bottom: 0 !important; gap: 8px !important; }
+.rec-scroll .rec .n { font-size: 12.5px; line-height: 1.15; }
+.rec-scroll .rec .small { font-size: 11px; line-height: 1.1; }
+.rec-scroll .rec br { line-height: 0; }
+.rec-scroll .rec .btn.sm, .rec-scroll .rec .btn.icon.sm { height: 22px; font-size: 12px; }
+.rec-scroll .rec .btn.icon.sm { width: 22px; }
+.rec-scroll .rec .btn.icon.sm svg { width: 12px; height: 12px; }
+.rec-scroll .rec .badge { padding: 0 7px; font-size: 11px; line-height: 18px; }
+.rec-scroll .rec input[type="checkbox"] { width: 16px; height: 16px; }
+#rec-gl .rec-got td { padding-top: 1px !important; padding-bottom: 1px !important; font-size: 12.5px; }
+#rec-gl .rec-got .btn.sm { height: 22px; min-height: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; font-size: 12px; }
+.rec-scroll { scrollbar-width: thin; scrollbar-color: transparent transparent; transition: scrollbar-color .2s; padding-right: 6px; }
+.rec-scroll:hover { scrollbar-color: color-mix(in srgb, var(--text) 18%, transparent) transparent; }
+.rec-scroll::-webkit-scrollbar { width: 4px; }
+.rec-scroll::-webkit-scrollbar-track { background: transparent; }
+.rec-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; }
+.rec-scroll:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text) 18%, transparent); }
+.rec-scroll > .rec, .rec-scroll > .rec > span { line-height: 1.15 !important; }
+.rec-scroll > .rec { min-height: 34px !important; }
