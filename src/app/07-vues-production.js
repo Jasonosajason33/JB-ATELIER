@@ -180,7 +180,7 @@
   function recRefresh() {
     const r = recData(), td = today(), w = $('#rec-wl'), g = $('#rec-gl');
     if (w) w.innerHTML = recWaitHtml(r.waiting, td); if (g) g.innerHTML = recGotHtml(r.got);
-    const a = $('#rec-nw'), b = $('#rec-ng'), c = $('#rec-qn'); if (a) a.textContent = 'Éléments reçus — à déclarer (' + recCount(r.waiting.length, r.nW) + ')'; if (b) b.textContent = 'Déjà reçus (' + recCount(r.got.length, r.nG) + ')';
+    const a = $('#rec-nw'), b = $('#rec-ng'), c = null; if (a) a.textContent = 'Éléments reçus — à déclarer (' + recCount(r.waiting.length, r.nW) + ')'; if (b) b.textContent = 'Déjà reçus (' + recCount(r.got.length, r.nG) + ')';
     if (c) c.textContent = r.q ? (r.waiting.length + r.got.length) + ' résultat' + (r.waiting.length + r.got.length > 1 ? 's' : '') : '';
     const x = $('#rec-qx'); if (x) x.style.display = S.recQ ? '' : 'none';
   }
@@ -191,9 +191,9 @@
     return '<div class="row" style="margin-bottom:14px">' + monthNav() + '<span class="spacer"></span>'
       + (S.me.collaborator_id ? '<button class="btn tg' + (S.recAll ? ' on' : '') + '" data-act="recall-tg" aria-pressed="' + !!S.recAll + '">' + ic(S.recAll ? 'check' : 'folder', 'sm') + 'Afficher tous les dossiers</button>' : '') + '</div>'
       + (!prods.length ? '<div class="notice warn">Le mois ' + deMonth(m) + ' n\'a pas encore ses dossiers. ' + (isManager() && missing ? '<button class="btn sm" data-act="generate" data-m="' + m + '">➕ Créer les dossiers du mois</button>' : 'Demandez à l\'administrateur de le générer.') + '</div>' : '')
-      // V26.213 : carte de recherche d'un dossier
-      + '<div class="card rec-search"><span class="ibox">' + ic('search', 'sm') + '</span><input type="search" data-in="rec-q" value="' + esc(S.recQ || '') + '" placeholder="Rechercher un client…" aria-label="Rechercher un client" autocomplete="off"><span class="small muted" id="rec-qn">' + (R.q ? (waiting.length + got.length) + ' résultat' + (waiting.length + got.length > 1 ? 's' : '') : '') + '</span><button class="btn sm ghost" id="rec-qx" data-act="rec-qx"' + (S.recQ ? '' : ' style="display:none"') + '>' + ic('x', 'sm') + 'Effacer</button></div>'
       + '<div class="grid g2"><div class="card"><div class="card-h"><h2 id="rec-nw">Éléments reçus — à déclarer (' + recCount(waiting.length, R.nW) + ')</h2>'
+      // V26.213 : recherche d'un client, sur la ligne du titre (à droite)
+      + '<label class="rec-q">' + ic('search', 'sm') + '<input type="search" data-in="rec-q" value="' + esc(S.recQ || '') + '" placeholder="Rechercher un client…" aria-label="Rechercher un client" autocomplete="off"><button type="button" class="rec-qx" id="rec-qx" data-act="rec-qx" aria-label="Effacer la recherche"' + (S.recQ ? '' : ' style="display:none"') + '>' + ic('x', 'sm') + '</button></label>'
       + (R.nW ? '<button class="btn sm" data-act="rec-all">Tout cocher</button>' : '') + '</div>'
       + '<div class="rec-list rec-scroll" id="rec-wl" data-keep="rec-wl">' + recWaitHtml(waiting, td) + '</div>'
       + '<div class="sticky-foot"><label class="f" style="flex-direction:row;align-items:center;gap:8px"><span>Reçus le</span><input type="date" data-ch="recdate" value="' + S.recDate + '" style="width:auto"></label><span class="spacer"></span>'
