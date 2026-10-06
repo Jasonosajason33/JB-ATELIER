@@ -187,6 +187,7 @@
     // V26.176 : un sous-titre sur chaque onglet du Pilotage — l'en-tête garde la même hauteur, les onglets ne sautent plus
     const sub = { planning: 'Organisation des tâches', receptions: 'Déclarez les éléments reçus en un geste', tva: 'Déclarations TVA, DEB, DES et acomptes d\'IS de vos dossiers', team: 'Niveau d\'activité et disponibilités de l\'équipe', clients: list('clients').length + ' dossiers', search: 'Clients, collaborateurs, missions', dashboard: 'Pilotage ' + deMonth(S.month), activite: 'Pilotage ' + deMonth(S.month), previsions: 'Pilotage · 3 prochains mois', kpi: 'Pilotage · 4 dernières semaines', history: isManager() ? 'Toutes les modifications' : 'Mes dossiers', export: 'Vos données, dans vos fichiers', settings: 'Équipe, utilisateurs et règles de planification' }[r] || '';
     return '<div class="title"><h1>' + esc(TITLES[r] || '') + '</h1>' + (sub ? '<div class="sub">' + esc(sub) + '</div>' : '') + '</div>'
+      + (r === 'receptions' ? '<div class="top-month">' + monthNav() + '</div>' : '') // V26.213 : mois sur la ligne du titre
       + '<div class="top-actions"><div class="status" id="status"></div>'
       // V26.172 : icônes seules (le nom du thème s'affiche dans la bulle au survol)
       + '<div class="theme-switch top-themes d-only" role="group" aria-label="Thème">' + THEMES.map(t => '<button class="' + (S.theme === t[0] ? 'on' : '') + '" data-act="theme" data-t="' + t[0] + '" title="Thème ' + t[1] + '" aria-label="Thème ' + t[1] + '">' + ic(t[2], 'sm') + '</button>').join('') + '</div>'

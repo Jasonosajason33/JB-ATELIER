@@ -1,4 +1,4 @@
-# JB Flow — fichier de reprise (état au 3 octobre 2026, version 26.212)
+# JB Flow — fichier de reprise (état au 3 octobre 2026, version 26.213)
 
 Coller ce fichier au début d'une nouvelle session Claude (cloud ou locale) pour reprendre le travail sans perte.
 Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraison, vocabulaire, module Révision, film).
@@ -7,7 +7,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - Application statique `app/` mise en ligne sur Cloudflare (https://jbflow.app-flow.workers.dev) depuis le dépôt GitHub « JB-FLOW-AUTOMATIC » (commande de build : `node build.js`). Base de données Supabase.
 - Sources : `src/app/NN-*.js`, assemblées dans `app/app.js` par `build.ps1` (PC sans Node) ou `build.js`.
 - Démo publiée (données fictives) : https://claude.ai/artifact/PaW1TkQGP4JfcWnmWqchyj — page `pub-demo/jbflow-demo.html`.
-- Tests du moteur : `app/tests/moteur.html` (7 tests, tous verts en 26.212).
+- Tests du moteur : `app/tests/moteur.html` (7 tests, tous verts en 26.213).
 - Dépôt de travail : GitHub « JB-ATELIER » (branche `claude/new-session-hylho7`) contient `app/`, `src/`, `supabase/`, `pub-demo/` et `sim/preview-cards.css`. Le dépôt « JB-FLOW-AUTOMATIC » (mis en ligne par Cloudflare) était resté en 26.45 au 3 octobre.
 - Outils de test automatisés (Edge sans fenêtre) : `sim/build-steps.ps1` + `sim/cdp-steps.ps1` ; aides `sim/crypto-helpers.js`.
 
@@ -22,7 +22,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - Aperçu « cartes de tâches fines + coche minimaliste » : visible seulement dans la démo (`sim/preview-cards.css`, ajouté à `pub-demo/design-effects.css` à chaque copie) — à valider avant intégration.
 - Après déploiement de la 26.181 et plus : ouvrir l'application avec le compte administrateur, dans sa propre vue, pour nettoyer automatiquement les doublons de tableaux de bord déjà enregistrés.
 
-## Dernières versions (26.176 → 26.212)
+## Dernières versions (26.176 → 26.213)
 - 26.176 : système d'animation commun aux 4 thèmes (`app/design-motion.css`, `src/app/021-mouvement.js` : FAST 140 / MEDIUM 200 / SLOW 280 ms, courbe cubic-bezier(.22, 1, .36, 1)).
 - 26.177 → 26.180 : cartes affinées (TVA, alertes, IS / CFE / CVAE, réceptions ajustées, historique, Dashboard Clients, fenêtre du Suivi TVA) ; effet de clic « ripple » (380 ms) ; doublons de tableaux de bord corrigés.
 - 26.181 : audit — plus aucune action ne gonfle un planning (temps d'un dossier scindé, demandes d'informations, réception partielle, génération du mois, création / import de dossiers).
@@ -57,6 +57,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - 26.210 : TVA validée par les impôts. Récap TVA : colonne « Validé » (coche verte, réversible) sur les déclarations envoyées — `productions.filing[code].valid = {at, by}` (sans migration, `setTvaValid`), statut « Validé » (filtre, export Excel). Suivi TVA : 5e carte « TVA validées », cartes resserrées sur une ligne. Colonnes « Date limite » et « Statut » du récap resserrées.
 - 26.211 : (1) Bug apprenti : le bouton « Tous les lundis… » ajoutait tous les lundis de l'année quand ils n'étaient pas tous cochés (impossible de décocher) → bouton à deux états (coché dès qu'un jour à venir est en entreprise, un clic le décoche) ; les tâches posées un jour non disponible (école, jour non travaillé) sont retirées, déverrouillées et replacées (`replanOffDays`, après jours de présence / jours travaillés, bouton « Replacer » en vue Semaine). (2) Absences à la demi-journée : Journée entière / Matin / Après-midi / Durée précise — type « conge|am » / « conge|pm » (sans migration, `E.absHalf`, matin = début de journée → pause) ; à l'ajout, les tâches qui ne tiennent plus (même verrouillées) sont replacées. (3) Vue Jour : journée non travaillée grisée en entier (gris plus soutenu), demi-journée grisée avec son libellé, tâches après la pause si absence le matin. (4) Cartes du suivi TVA 30 % moins hautes.
 - 26.212 : absences visibles partout. Semaine : demi-journée = bande grisée en haut (matin, puis « Après-midi » et les tâches) ou en bas (après-midi). Mois équipe (`teamGantt`) : jours non travaillés en gris soutenu, demi-journée grisée à moitié (gauche = matin, droite = après-midi), motif au survol. Mois individuel (`planMonth`) : cases d'absence / école grisées avec le motif, demi-journée grisée en haut ou en bas.
+- 26.213 : Réceptions. Recherche d'un client sur la ligne du titre « Éléments reçus — à déclarer » (filtre les deux listes, sans accents ni majuscules, compteur « n / total », « Tout cocher » ne coche que les dossiers affichés ; `recData` / `recRefresh`). Plus de pages : listes de 10 lignes visibles, défilement à la molette, barre de défilement fine invisible au repos (visible au survol). Lignes ~20 % plus basses (deux fois). Sélecteur de mois dans l'en-tête, sur la ligne du titre (`topHtml`, `.top-month`).
 
 ## Film de présentation (v3 du 1er octobre 2026 — à reprendre plus tard)
 - But : présenter JB Flow aux supérieurs. Lien : https://claude.ai/artifact/J1CXu3csSo28ST8YGcrTpH (v3 publiée).

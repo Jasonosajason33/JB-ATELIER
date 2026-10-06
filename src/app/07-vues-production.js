@@ -188,8 +188,7 @@
     const m = S.month, td = today();
     const R = recData(), prods = R.prods, waiting = R.waiting, got = R.got;
     const missing = missingForMonth(m);
-    return '<div class="row" style="margin-bottom:14px">' + monthNav() + '<span class="spacer"></span>'
-      + (S.me.collaborator_id ? '<button class="btn tg' + (S.recAll ? ' on' : '') + '" data-act="recall-tg" aria-pressed="' + !!S.recAll + '">' + ic(S.recAll ? 'check' : 'folder', 'sm') + 'Afficher tous les dossiers</button>' : '') + '</div>'
+    return (S.me.collaborator_id ? '<div class="row" style="margin-bottom:14px"><span class="spacer"></span><button class="btn tg' + (S.recAll ? ' on' : '') + '" data-act="recall-tg" aria-pressed="' + !!S.recAll + '">' + ic(S.recAll ? 'check' : 'folder', 'sm') + 'Afficher tous les dossiers</button></div>' : '') // V26.213 : le mois est dans l'en-tête
       + (!prods.length ? '<div class="notice warn">Le mois ' + deMonth(m) + ' n\'a pas encore ses dossiers. ' + (isManager() && missing ? '<button class="btn sm" data-act="generate" data-m="' + m + '">➕ Créer les dossiers du mois</button>' : 'Demandez à l\'administrateur de le générer.') + '</div>' : '')
       + '<div class="grid g2"><div class="card"><div class="card-h"><h2 id="rec-nw">Éléments reçus — à déclarer (' + recCount(waiting.length, R.nW) + ')</h2>'
       // V26.213 : recherche d'un client, sur la ligne du titre (à droite)
