@@ -89,7 +89,8 @@
     'ms-detail': el => openSheet({ type: 'msDetail', m: el.dataset.m, wide: true }),
     'replan-apply': () => applyReplan(),
     'rec-validate': () => validateReceptions([...S.recSel], S.route === 'receptions' ? S.recDate : today()),
-    'rec-all': () => { list('productions').filter(p => p.month === S.month && !p.received_date).forEach(p => { const c = clientOf(p.client_id); if (c && (S.recAll || !S.me.collaborator_id || c.collaborator_id === S.me.collaborator_id)) S.recSel.add(p.id); }); render(); },
+    'rec-all': () => { recData().waiting.forEach(p => S.recSel.add(p.id)); render(); }, // V26.213 : coche les dossiers affichés (recherche)
+    'rec-qx': () => { S.recQ = ''; const i = $('[data-in="rec-q"]'); if (i) { i.value = ''; i.focus(); } recRefresh(); },
     'rec-undo': el => undoReception(el.dataset.id),
     'rec-one': el => validateReceptions([el.dataset.id], today()),
     'rec-part': (el, e) => { e.preventDefault(); e.stopPropagation(); receivePartial(el.dataset.id); },
@@ -288,6 +289,7 @@
     recq: el => { S.recQ = el.value; S.recPage_h = 1; const r = $('#rec-home'); if (r && S._recHome) fxSwap(r, recHomeList(S._recHome.recs, S._recHome.d)); }, // V26.157
     csearch: el => { S.clientSearch = el.value; const r = $('#results'); if (r) fxSwap(r, clientsTable()); },
     search: el => { S.search = el.value; const r = $('#results'); if (r) fxSwap(r, searchResults()); },
+    'rec-q': el => { S.recQ = el.value; recRefresh(); }, // V26.213 : recherche des Réceptions
     'pc-q': el => { S.pf = Object.assign({}, S.pf, { q: el.value }); pcRefresh(); } // V26.186 : recherche du Planning
   };
   Object.assign(ACT, {

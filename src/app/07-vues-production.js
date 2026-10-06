@@ -163,22 +163,42 @@
 
   /* ---------- Vue RÉCEPTIONS ---------- */
   const monthNavRow = () => '<div class="tva-nav">' + monthNav() + '<div class="tva-recaps"><button class="btn primary tva-recap-btn" data-act="tva-recap">' + ic('list', 'sm') + 'Récap TVA du mois</button><button class="btn tva-recap-btn2" data-act="is-recap">' + ic('list', 'sm') + 'Récap Acompte IS</button><button class="btn tva-recap-btn2" data-act="cfe-recap">' + ic('list', 'sm') + 'Récap CFE</button></div><span></span></div>'; // V26.97 : bouton centré et allongé
+  /* V26.213 : listes des Réceptions (recherche par nom de dossier, listes déroulantes à la molette au lieu des pages) */
+  const recNorm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  function recData() {
+    const m = S.month, prods = list('productions').filter(p => p.month === m), q = recNorm(S.recQ).trim();
+    const mine = p => { const c = clientOf(p.client_id); return c && (S.recAll || !S.me.collaborator_id || c.collaborator_id === S.me.collaborator_id); };
+    const hit = p => !q || recNorm((clientOf(p.client_id) || {}).name).includes(q);
+    const waitAll = prods.filter(p => !p.received_date && mine(p)), gotAll = prods.filter(p => p.received_date && mine(p));
+    const waiting = waitAll.filter(hit).sort((a, b) => (a.expected_date || '').localeCompare(b.expected_date || '') || byName(clientOf(a.client_id) || {}, clientOf(b.client_id) || {}));
+    const got = gotAll.filter(hit).sort((a, b) => b.received_date.localeCompare(a.received_date));
+    return { prods, waiting, got, nW: waitAll.length, nG: gotAll.length, q };
+  }
+  const recWaitHtml = (w, td) => w.length ? w.map(p => recRow(p, td)).join('') : '<div class="empty">' + (S.recQ ? 'Aucun dossier à recevoir ne correspond.' : 'Tous les éléments sont reçus 🎉') + '</div>';
+  const recGotHtml = g => g.length ? '<table class="t rec-got"><tbody>' + g.map(p => { const c = clientOf(p.client_id) || {}; return '<tr><td>✅ <b>' + esc(c.name) + '</b></td><td class="small muted">reçus le ' + fDM(p.received_date) + '</td><td class="num"><button class="btn sm" data-act="rec-undo" data-id="' + p.id + '">Annuler</button></td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">' + (S.recQ ? 'Aucun dossier reçu ne correspond.' : 'Aucun pour l\'instant.') + '</div>';
+  const recCount = (n, all) => n === all ? String(all) : n + ' / ' + all;
+  function recRefresh() {
+    const r = recData(), td = today(), w = $('#rec-wl'), g = $('#rec-gl');
+    if (w) w.innerHTML = recWaitHtml(r.waiting, td); if (g) g.innerHTML = recGotHtml(r.got);
+    const a = $('#rec-nw'), b = $('#rec-ng'), c = $('#rec-qn'); if (a) a.textContent = 'Éléments reçus — à déclarer (' + recCount(r.waiting.length, r.nW) + ')'; if (b) b.textContent = 'Déjà reçus (' + recCount(r.got.length, r.nG) + ')';
+    if (c) c.textContent = r.q ? (r.waiting.length + r.got.length) + ' résultat' + (r.waiting.length + r.got.length > 1 ? 's' : '') : '';
+    const x = $('#rec-qx'); if (x) x.style.display = S.recQ ? '' : 'none';
+  }
   function vReceptions() {
     const m = S.month, td = today();
-    const prods = list('productions').filter(p => p.month === m);
-    const mine = p => { const c = clientOf(p.client_id); return c && (S.recAll || !S.me.collaborator_id || c.collaborator_id === S.me.collaborator_id); };
-    const waiting = prods.filter(p => !p.received_date && mine(p)).sort((a, b) => (a.expected_date || '').localeCompare(b.expected_date || '') || byName(clientOf(a.client_id) || {}, clientOf(b.client_id) || {}));
-    const got = prods.filter(p => p.received_date && mine(p)).sort((a, b) => b.received_date.localeCompare(a.received_date));
+    const R = recData(), prods = R.prods, waiting = R.waiting, got = R.got;
     const missing = missingForMonth(m);
     return '<div class="row" style="margin-bottom:14px">' + monthNav() + '<span class="spacer"></span>'
       + (S.me.collaborator_id ? '<button class="btn tg' + (S.recAll ? ' on' : '') + '" data-act="recall-tg" aria-pressed="' + !!S.recAll + '">' + ic(S.recAll ? 'check' : 'folder', 'sm') + 'Afficher tous les dossiers</button>' : '') + '</div>'
       + (!prods.length ? '<div class="notice warn">Le mois ' + deMonth(m) + ' n\'a pas encore ses dossiers. ' + (isManager() && missing ? '<button class="btn sm" data-act="generate" data-m="' + m + '">➕ Créer les dossiers du mois</button>' : 'Demandez à l\'administrateur de le générer.') + '</div>' : '')
-      + '<div class="grid g2"><div class="card"><div class="card-h"><h2>Éléments reçus — à déclarer (' + waiting.length + ')</h2>'
-      + (waiting.length ? '<button class="btn sm" data-act="rec-all">Tout cocher</button>' : '') + '</div>'
-      + (waiting.length ? recPager('w', waiting.length, 8) + '<div class="rec-list">' + recPage('w', waiting, 8).map(p => recRow(p, td)).join('') + '</div>' + recPager('w', waiting.length, 8, true) : '<div class="empty">Tous les éléments sont reçus 🎉</div>')
+      // V26.213 : carte de recherche d'un dossier
+      + '<div class="card rec-search"><span class="ibox">' + ic('search', 'sm') + '</span><input type="search" data-in="rec-q" value="' + esc(S.recQ || '') + '" placeholder="Rechercher un client…" aria-label="Rechercher un client" autocomplete="off"><span class="small muted" id="rec-qn">' + (R.q ? (waiting.length + got.length) + ' résultat' + (waiting.length + got.length > 1 ? 's' : '') : '') + '</span><button class="btn sm ghost" id="rec-qx" data-act="rec-qx"' + (S.recQ ? '' : ' style="display:none"') + '>' + ic('x', 'sm') + 'Effacer</button></div>'
+      + '<div class="grid g2"><div class="card"><div class="card-h"><h2 id="rec-nw">Éléments reçus — à déclarer (' + recCount(waiting.length, R.nW) + ')</h2>'
+      + (R.nW ? '<button class="btn sm" data-act="rec-all">Tout cocher</button>' : '') + '</div>'
+      + '<div class="rec-list rec-scroll" id="rec-wl" data-keep="rec-wl">' + recWaitHtml(waiting, td) + '</div>'
       + '<div class="sticky-foot"><label class="f" style="flex-direction:row;align-items:center;gap:8px"><span>Reçus le</span><input type="date" data-ch="recdate" value="' + S.recDate + '" style="width:auto"></label><span class="spacer"></span>'
       + '<button class="btn primary rec-ok" data-act="rec-validate" ' + (S.recSel.size && !S.readonly ? '' : 'disabled') + '>' + ic('check', 'sm') + 'Valider (' + S.recSel.size + ')</button></div></div>'
-      + '<div class="card"><h2 style="margin-bottom:10px">Déjà reçus (' + got.length + ')</h2>' + (got.length ? recPager('g', got.length, 15) + '<table class="t rec-got"><tbody>' + recPage('g', got, 15).map(p => { const c = clientOf(p.client_id) || {}; return '<tr><td>✅ <b>' + esc(c.name) + '</b></td><td class="small muted">reçus le ' + fDM(p.received_date) + '</td><td class="num"><button class="btn sm" data-act="rec-undo" data-id="' + p.id + '">Annuler</button></td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">Aucun pour l\'instant.</div>') + '</div></div>';
+      + '<div class="card"><h2 style="margin-bottom:10px"><span id="rec-ng">Déjà reçus (' + recCount(got.length, R.nG) + ')</span></h2><div class="rec-scroll" id="rec-gl" data-keep="rec-gl">' + recGotHtml(got) + '</div></div></div>';
   }
 
   /* ---------- Vue DOSSIERS ---------- */
