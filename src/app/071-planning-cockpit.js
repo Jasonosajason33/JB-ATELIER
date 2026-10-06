@@ -167,15 +167,16 @@
 
   /* ---------- Vue Jour : frise horaire de l'équipe ---------- */
   function pcDay(d, sets, m) {
-    const x = ctx(), td = today(), st0 = E.parseClock(cfg().day_start), all = list('tasks');
+    const x = ctx(), td = today(), st0 = E.parseClock(cfg().day_start), all = list('tasks'), L = lunchOf();
     const rows = pcScope().map(c => {
       const items = withTimes(dayTasks(c.id, d), d).map(it => ({ t: it.t, a: it.segs[0].a, b: it.segs[it.segs.length - 1].b, segs: it.segs }));
       const cap = E.capacityOn(c, d, x), load = E.loadOf(all, c.id, d).total, full = E.capacityOn(c, d, x, true);
-      return { c, items, cap, full, load, ab: E.absenceOn(c.id, d, x) };
+      const ab = E.absenceOn(c.id, d, x), half = ab ? E.absHalf(ab) : ''; // V26.211 : absence d'une demi-journée
+      return { c, items, cap, full, load, ab, half, st: half === 'am' && L.b > L.a ? L.b : st0 };
     });
     let h0 = Math.min(PC.H0, Math.floor(st0 / 60) * 60), h1 = PC.H1;
-    const capEndOf = cap => { const sg = clockSegs(st0, cap); return sg[sg.length - 1].b; }, L = lunchOf();
-    rows.forEach(r => { r.items.forEach(i => { h1 = Math.max(h1, Math.ceil(i.b / 60) * 60); }); if (r.full) h1 = Math.max(h1, Math.ceil(capEndOf(r.full) / 60) * 60); });
+    const capEndOf = (cap, st) => { const sg = clockSegs(st === undefined ? st0 : st, cap); return sg[sg.length - 1].b; };
+    rows.forEach(r => { r.items.forEach(i => { h1 = Math.max(h1, Math.ceil(i.b / 60) * 60); }); if (r.full) h1 = Math.max(h1, Math.ceil(capEndOf(r.full, r.st) / 60) * 60); });
     h1 = Math.min(Math.max(h1, h0 + 60), 24 * 60);
     const span = h1 - h0, hours = span / 60, pos = v => ((v - h0) / span * 100).toFixed(3) + '%';
     const head = '<div class="pc-row pc-head"><div class="pc-who pc-who-h"><b>' + (S.planAll ? 'Équipe' : 'Planning') + '</b><span>' + rows.length + ' personne' + (rows.length > 1 ? 's' : '') + '</span></div><div class="pc-hours">'
@@ -186,13 +187,15 @@
       + '<div class="pc-unpl-list" data-keep="pc-unpl" data-drop="unpl">' + (un.length ? un.map(t => pcCard(t, null, { who: S.planAll })).join('') : '<span class="pc-unpl-empty">Glissez ici une tâche pour la remettre « à affecter »</span>') + '</div></div>' : '';
     const body = rows.map(r => {
       const f = pcFill(r.load, r.cap), hol = x.settings.holidays && E.holidayName(d), off = r.cap <= 0;
-      const offLbl = hol ? 'Férié · ' + hol : r.ab && (r.ab.minutes === null || r.ab.minutes === undefined || r.ab.minutes === '') ? absLabel(r.ab) : r.c.kind === 'apprenti' ? 'École / hors entreprise' : 'Non travaillé';
+      const offLbl = hol ? 'Férié · ' + hol : r.ab && !r.half && (r.ab.minutes === null || r.ab.minutes === undefined || r.ab.minutes === '') ? absLabel(r.ab) : r.c.kind === 'apprenti' ? 'École / hors entreprise' : 'Non travaillé';
       const shown = r.items.filter(i => pcMatch(i.t, pcState(i.t, d, i)));
-      const lastEnd = r.items.reduce((v, i) => Math.max(v, i.b), st0), capEnd = capEndOf(r.cap), resM = off ? 0 : Math.max(0, r.full - r.cap), fullEnd = resM ? capEndOf(r.full) : capEnd;
+      const lastEnd = r.items.reduce((v, i) => Math.max(v, i.b), r.st), capEnd = capEndOf(r.cap, r.st), resM = off ? 0 : Math.max(0, r.full - r.cap), fullEnd = resM ? capEndOf(r.full, r.st) : capEnd;
+      // V26.211 : journée non travaillée (école, absence, férié) grisée en entier ; demi-journée d'absence grisée sur le matin ou l'après-midi
+      const halfZ = !off && r.half && L.b > L.a ? (r.half === 'am' ? '<i class="pc-absz" style="left:' + pos(Math.max(h0, st0)) + ';width:' + ((L.a - Math.max(h0, st0)) / span * 100).toFixed(3) + '%"><span>' + esc(absLabel(r.ab)) + '</span></i>' : '<i class="pc-absz" style="left:' + pos(L.b) + ';right:0"><span>' + esc(absLabel(r.ab)) + '</span></i>') : '';
       // V26.206 : temps gardé pour les imprévus, en fin de journée (jamais planifié)
       const res = resM && fullEnd > capEnd ? '<i class="pc-res" style="left:' + pos(Math.min(capEnd, h1)) + ';width:' + ((Math.min(fullEnd, h1) - Math.min(capEnd, h1)) / span * 100).toFixed(3) + '%" title="Temps gardé pour les imprévus (appels, mails, questions) : ' + E.fmtMin(resM) + '"><span>' + (resM >= 50 ? 'Imprévus · ' : '') + E.fmtMin(resM) + '</span></i>' : '';
       const ghost = !off && capEnd > lastEnd && d >= td && !pcFiltered() ? '<div class="pc-free" style="left:' + pos(lastEnd) + ';width:' + ((capEnd - lastEnd) / span * 100).toFixed(3) + '%" title="Disponible : ' + E.fmtMin(Math.max(0, r.cap - r.load)) + '"><span>' + (r.cap - r.load >= 50 ? 'Disponible · ' : '') + E.fmtMin(Math.max(0, r.cap - r.load)) + '</span></div>' : '';
-      const zones = '<i class="pc-zone" style="left:0;width:' + pos(st0) + '"></i>' + (off || L.b <= L.a || L.b <= h0 || L.a >= h1 ? '' : '<i class="pc-lunch" style="left:' + pos(L.a) + ';width:' + ((L.b - L.a) / span * 100).toFixed(3) + '%"><span>Pause</span></i>') + (off ? '' : res + '<i class="pc-zone" style="left:' + pos(Math.min(fullEnd, h1)) + ';right:0"></i><i class="pc-capend' + (overAlert(r.load, r.cap) ? ' over' : '') + '" style="left:' + pos(Math.min(capEnd, h1)) + '"></i>');
+      const zones = (off ? '<i class="pc-offz"></i>' : '<i class="pc-zone" style="left:0;width:' + pos(st0) + '"></i>') + halfZ + (off || r.half || L.b <= L.a || L.b <= h0 || L.a >= h1 ? '' : '<i class="pc-lunch" style="left:' + pos(L.a) + ';width:' + ((L.b - L.a) / span * 100).toFixed(3) + '%"><span>Pause</span></i>') + (off ? '' : res + (r.half === 'pm' ? '' : '<i class="pc-zone" style="left:' + pos(Math.min(fullEnd, h1)) + ';right:0"></i>') + '<i class="pc-capend' + (overAlert(r.load, r.cap) ? ' over' : '') + '" style="left:' + pos(Math.min(capEnd, h1)) + '"></i>');
       return '<div class="pc-row' + (off ? ' off' : '') + '"><div class="pc-who">' + pcAv(r.c) + '<div class="pc-who-t"><b>' + esc(r.c.name) + (r.c.id === S.me.collaborator_id ? ' <small>moi</small>' : '') + '</b><span>' + esc(PC_KIND[r.c.kind] || '') + '</span>'
         + '<span class="pc-who-load"><b>' + E.fmtMin(r.load) + '</b>' + (r.cap ? ' / ' + E.fmtMin(r.cap) : '') + '<span class="lbl"> planifiées</span></span>' + (off && !r.load ? '' : pcBar(f, true) + '<span class="pc-who-f f-' + f.cls + '">' + esc(f.txt) + '</span>') + '</div></div>'
         + '<div class="pc-track" data-drop="' + d + '" data-dc="' + r.c.id + '">' + zones + (off ? '<span class="pc-off-l">' + esc(offLbl) + '</span>' : '') + ghost + shown.map(i => i.segs.map((sg, k) => pcBlock(i, d, h0, span, sg, k, i.segs.length)).join('')).join('') + '</div></div>';
@@ -219,8 +222,11 @@
         const f = pcFill(load, cap), ts = dayTasks(c.id, d).filter(t => pcMatch(t, pcState(t, d, null)));
         const hol = x.settings.holidays && E.holidayName(d), ab = E.absenceOn(c.id, d, x);
         const max = 6, more = ts.length - max;
-        return '<div class="pc-wcell' + (d === td ? ' today' : '') + (!cap && !load ? ' off' : '') + '" data-drop="' + d + '" data-dc="' + c.id + '">'
-          + (cap || load ? '<div class="pc-wcap" title="' + esc(E.fmtMin(load) + ' planifiées sur ' + E.fmtMin(cap) + ' · ' + f.txt) + '"><span><b>' + E.fmtMin(load) + '</b> / ' + E.fmtMin(cap) + '</span>' + pcBar(f, true) + '</div>' : '<div class="pc-off-l">' + esc(hol ? 'Férié' : ab ? absLabel(ab) : c.kind === 'apprenti' ? 'École' : 'Non travaillé') + '</div>')
+        return '<div class="pc-wcell' + (d === td ? ' today' : '') + (!cap ? ' off' : '') + '" data-drop="' + d + '" data-dc="' + c.id + '">'
+          // V26.211 : tâches posées un jour non travaillé → signalées, avec « Replacer »
+          + (!cap && load ? '<div class="pc-off-l warn">' + esc(hol ? 'Férié' : ab && !E.absHalf(ab) ? absLabel(ab) : c.kind === 'apprenti' ? 'École' : 'Non travaillé') + ' · ' + E.fmtMin(load) + ' à replacer' + (S.readonly ? '' : ' <button class="btn sm" data-act="off-replan" data-c="' + c.id + '">Replacer</button>') + '</div>'
+          : ab && E.absHalf(ab) ? '<div class="pc-half">' + esc(absLabel(ab)) + '</div>' : '')
+          + (cap ? '<div class="pc-wcap" title="' + esc(E.fmtMin(load) + ' planifiées sur ' + E.fmtMin(cap) + ' · ' + f.txt) + '"><span><b>' + E.fmtMin(load) + '</b> / ' + E.fmtMin(cap) + '</span>' + pcBar(f, true) + '</div>' : load ? '' : '<div class="pc-off-l">' + esc(hol ? 'Férié' : ab ? absLabel(ab) : c.kind === 'apprenti' ? 'École' : 'Non travaillé') + '</div>')
           + ts.slice(0, more > 0 ? max - 1 : max).map(t => pcCard(t, d)).join('') + (more > 0 ? '<button class="pc-more" data-act="teamcell" data-c="' + c.id + '" data-date="' + d + '">+ ' + (more + 1) + ' autres</button>' : '') + '</div>';
       }).join('');
       const f = pcFill(tl, tc);

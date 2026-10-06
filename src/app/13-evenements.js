@@ -112,17 +112,20 @@
     'pres-dow': el => presSave(set => {
       const y = S.presYear || Number(today().slice(0, 4)), w = Number(el.dataset.w);
       const ds = E.rangeDates(y + '-01-01', y + '-12-31').filter(d => E.dow(d) === w && !E.holidayName(d));
-      const all = ds.every(d => set.has(d)); ds.forEach(d => all ? set.delete(d) : set.add(d));
+      // V26.211 : bouton à deux états — « coché » dès qu'un de ces jours (à venir) est en entreprise ; un clic le décoche entièrement
+      const on = ds.some(d => d >= today() && set.has(d)); ds.forEach(d => on ? set.delete(d) : (d >= today() && set.add(d)));
     }),
     'pres-clear': async el => { const y = String(S.presYear || today().slice(0, 4)); if (!await confirmBox('Effacer les jours de présence', '<p>Tous les jours de présence de ' + y + ' seront effacés.</p>', 'Effacer', true)) return; presSave(set => [...set].filter(d => d.startsWith(y + '-')).forEach(d => set.delete(d))); },
-    'abs-add': async el => {      const from = $('#abs-from').value, to = $('#abs-to').value || from, kind = $('#abs-kind').value, mt = $('#abs-min').value.trim(), note = $('#abs-note').value.trim();
+    'abs-add': async el => {      const from = $('#abs-from').value, to = $('#abs-to').value || from, part = ($('#abs-part') || {}).value || '', kind = $('#abs-kind').value + (part === 'am' || part === 'pm' ? '|' + part : ''), mt = part === 'h' ? $('#abs-min').value.trim() : '', note = $('#abs-note').value.trim();
+      if (part === 'h' && !mt) { toast('Indiquez la durée (ex. 2h).', 'warn'); return; }
       if (!from) { toast('Indiquez la date de début.', 'warn'); return; }
-      if (kind === 'autre' && !note) { toast('Précisez le motif de l\'indisponibilité (ex. séminaire).', 'warn'); return; }
+      if (kind.split('|')[0] === 'autre' && !note) { toast('Précisez le motif de l\'indisponibilité (ex. séminaire).', 'warn'); return; }
       if (to < from) { toast('La date de fin précède la date de début.', 'warn'); return; }
       const minutes = mt ? E.parseDuration(mt) : null;
       if (mt && isNaN(minutes)) { toast('Durée illisible.', 'warn'); return; }
       try { await saveInsert('absences', [{ id: P.uuid(), collaborator_id: el.dataset.id, date_from: from, date_to: to, kind, minutes, note: note || null }]); hist('collaborateur', { entity: 'collaborator', entity_id: el.dataset.id, detail: { text: 'Indisponibilité ' + fDMY(from) + ' → ' + fDMY(to) } }); const n = await replanAbsence(el.dataset.id, from, to); toast('Indisponibilité ajoutée' + (n ? ' : ' + n + ' dossier(s) replacé(s) sur d\'autres jours.' : '.'), 'ok'); render(); } catch (e) { /* affiché */ }
     },
+    'off-replan': el => replanOffDays(el.dataset.c).then(n => { if (!n) toast('Rien à replacer.', 'ok', null, 2500); }), // V26.211
     'abs-del': async el => { if (await saveRemove('absences', el.dataset.id)) toast('Indisponibilité supprimée.', 'ok'); },
     'user-new': () => openSheet({ type: 'user', draft: { name: '', email: '', role: 'collab', collaborator_id: null, active: true } }),
     'start-edit': () => { if (isManager() && !S.readonly) askStartMonth(true); }, // V26.169 : revenir sur le mois de début si on s'est trompé
@@ -187,7 +190,7 @@
       const d = Number(el.dataset.d), days = new Set(c.work_days || []); if (el.checked) days.add(d); else days.delete(d);
       const wd = [...days].sort();
       if (!s.id) { s.draft.work_days = wd; renderSheet(); return; }
-      saveUpdate('collaborators', c.id, { work_days: wd }, { history: { action: 'collaborateur', entity: 'collaborator', entity_id: c.id, detail: { text: c.name + ' : jours travaillés' } } });
+      saveUpdate('collaborators', c.id, { work_days: wd }, { history: { action: 'collaborateur', entity: 'collaborator', entity_id: c.id, detail: { text: c.name + ' : jours travaillés' } } }).then(r => { if (r === 'ok') replanOffDays(c.id); });
     },
     'u-field': el => {
       const s = S.sheet, k = el.dataset.k, v = el.type === 'checkbox' ? el.checked : (el.value || (k === 'collaborator_id' ? null : ''));
@@ -209,6 +212,7 @@
       const u = S.data.app_users.get(s.id); if (!u) return;
       if (await setUserStart(u.email, el.value)) toast('Début d\'utilisation de ' + u.name + ' : ' + (el.value ? fMonth(el.value) : 'comme le cabinet') + '.', 'ok', null, 3000);
     },
+    'abs-part': el => { const i = $('#abs-min'); if (i) i.parentNode.style.display = el.value === 'h' ? '' : 'none'; }, // V26.211
     'co-hours': el => { // V26.208 : horaires d'un jour de la semaine
       const s = S.sheet, c = s && S.data.collaborators.get(s.id); if (!c) return;
       const z = String(el.value).trim(), v = z === '' || /^0+$/.test(z) ? 0 : E.parseDuration(z);

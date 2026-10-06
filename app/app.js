@@ -638,8 +638,10 @@
     return st < L.a && e > L.a ? [{ a: st, b: L.a }, { a: L.b, b: L.b + e - L.a }] : [{ a: st, b: e }];
   }
   function withTimes(tasks, date) {
-    const m = E.parseClock(cfg().day_start), by = {};
-    return tasks.map(t => { const k = t.collaborator_id; if (!(k in by)) by[k] = m; const sg = clockSegs(by[k], E.minutesOn(t, date) || 0); by[k] = sg[sg.length - 1].b; return { t, time: E.fmtClock(sg[0].a), date, segs: sg }; });
+    const m = E.parseClock(cfg().day_start), by = {}; let x = null;
+    // V26.211 : absence le matin → la journée commence après la pause
+    const startOf = k => { x = x || ctx(); const ab = E.absenceOn(k, date, x), L = lunchOf(); return ab && E.absHalf(ab) === 'am' && L.b > L.a ? L.b : m; };
+    return tasks.map(t => { const k = t.collaborator_id; if (!(k in by)) by[k] = startOf(k); const sg = clockSegs(by[k], E.minutesOn(t, date) || 0); by[k] = sg[sg.length - 1].b; return { t, time: E.fmtClock(sg[0].a), date, segs: sg }; });
   }
   function prodLine(p) {
     if (!p) return '';
@@ -1039,7 +1041,12 @@
   /* Week-end : on bascule sur le lundi suivant (le samedi et le dimanche n'existent pas dans l'outil) */
   function weekday(d) { while (E.dow(d) >= 6) d = E.addDays(d, 1); return d; }
   const ABS_KINDS = [['conge', 'Congés'], ['absence', 'Absence'], ['formation', 'Formation'], ['reunion', 'Réunion interne'], ['autre', 'Autre (préciser)']];
-  function absLabel(a) { const k = a.kind === 'autre' && a.note ? a.note : (Object.fromEntries(ABS_KINDS)[a.kind] || 'Absence').replace(' (préciser)', ''); return k + (a.minutes ? ' (' + E.fmtMin(a.minutes) + ')' : ' (journée)'); }
+  // V26.211 : demi-journée stockée dans le type (« conge|am » / « conge|pm »), sans migration
+  const absKind = a => String((a && a.kind) || '').split('|')[0];
+  const ABS_HALF = { am: 'matin', pm: 'après-midi' };
+  function absLabel(a) { const kd = absKind(a), h = E.absHalf(a), k = kd === 'autre' && a.note ? a.note : (Object.fromEntries(ABS_KINDS)[kd] || 'Absence').replace(' (préciser)', ''); return k + (h ? ' (' + ABS_HALF[h] + ')' : a.minutes ? ' (' + E.fmtMin(a.minutes) + ')' : ' (journée)'); }
+  const absPartField = () => '<label class="f"><span>Durée</span><select id="abs-part" data-ch="abs-part"><option value="">Journée entière</option><option value="am">Matin</option><option value="pm">Après-midi</option><option value="h">Durée précise…</option></select></label>'
+    + '<label class="f" style="display:none"><span>Heures d\'absence par jour</span><input type="text" id="abs-min" placeholder="ex. 3h30"></label>';
   const AL_ICON = { projection: ['users', 'r'], overload: ['flame', 'r'], near: ['gauge', 'o'], due: ['clock', 'o'], unplanned: ['alert', 'o'], late: ['alert', 'r'], received: ['inbox', 'b'] };
   function alertList(al, max) {
     if (!al.length) return '<div class="empty">Aucune alerte — tout est sous contrôle.</div>';
@@ -1969,7 +1976,7 @@
   function absenceForm(cid) {
     return '<div class="form" style="margin-top:10px"><label class="f"><span>Du</span><input type="date" id="abs-from"></label><label class="f"><span>Au</span><input type="date" id="abs-to"></label>'
       + '<label class="f"><span>Type</span><select id="abs-kind">' + ABS_KINDS.map(k => '<option value="' + k[0] + '">' + k[1] + '</option>').join('') + '</select></label>'
-      + '<label class="f"><span>Durée / jour (vide = journée)</span><input type="text" id="abs-min" placeholder="ex. 3h30"></label><label class="f"><span>Précision (ex. séminaire, réunion d\'équipe)</span><input type="text" id="abs-note" placeholder="Formation TVA, réunion interne…"></label></div>'
+      + absPartField() + '<label class="f"><span>Précision (ex. séminaire, réunion d\'équipe)</span><input type="text" id="abs-note" placeholder="Formation TVA, réunion interne…"></label></div>'
       + '<div class="row" style="margin-top:8px"><button class="btn primary" data-act="abs-add" data-id="' + cid + '">+ Ajouter</button><span class="small muted">Les dossiers prévus ces jours-là sont replacés automatiquement.</span></div>';
   }
   function myAbsenceCard() {
@@ -1980,9 +1987,28 @@
       + absenceForm(cid) + '</div>';
   }
   /* Après une absence : les dossiers prévus ces jours-là sont retirés puis replacés (le reste du planning ne bouge pas) */
+  /* V26.211 — Tâches posées un jour où la personne n'est plus disponible (école, jour non travaillé, absence) :
+   * retirées de ce jour (et déverrouillées), puis replacées par le planificateur. */
+  async function replanOffDays(cid, quiet) {
+    const c = collabOf(cid); if (!c || S.readonly) return 0;
+    const x = ctx(), td = today();
+    const hit = list('tasks').filter(t => t.collaborator_id === cid && !t.done && t.planned_date && canEditTask(t) && E.segs(t).some(s => s.d >= td && E.capacityOn(c, s.d, x, true) <= 0));
+    if (!hit.length) return 0;
+    await saveMany('tasks', hit.map(t => ({ id: t.id, patch: { planned_date: null, alloc: null, seq: 0, locked: false } })));
+    for (const m of new Set(hit.map(t => t.month))) await applyPlan(runPlan(m, 'incremental', new Set(hit.filter(t => t.month === m).map(t => t.production_id).filter(Boolean))));
+    if (!quiet) toast(hit.length + ' tâche' + (hit.length > 1 ? 's' : '') + ' de ' + c.name + ' replacée' + (hit.length > 1 ? 's' : '') + ' : elle' + (hit.length > 1 ? 's' : '') + ' étai' + (hit.length > 1 ? 'ent' : 't') + ' prévue' + (hit.length > 1 ? 's' : '') + ' un jour où ' + c.name + ' n\'est pas disponible.', 'ok', null, 5000);
+    return hit.length;
+  }
   async function replanAbsence(cid, from, to) {
-    const hit = list('tasks').filter(t => t.collaborator_id === cid && !t.done && !t.locked && E.segs(t).some(s => s.d >= from && s.d <= to));
-    if (hit.length) await saveMany('tasks', hit.map(t => ({ id: t.id, patch: { planned_date: null, alloc: null, seq: 0 } })));
+    // V26.211 : chaque jour de l'absence, on garde les tâches (même verrouillées) qui tiennent dans le temps restant
+    // (demi-journée : la moitié de la journée) ; les autres sont retirées, déverrouillées et replacées.
+    const c = collabOf(cid), x = ctx(), own = list('tasks').filter(t => t.collaborator_id === cid && !t.done && canEditTask(t)), out = new Set();
+    for (let d = from; d <= to; d = E.addDays(d, 1)) {
+      const cap = c ? E.capacityOn(c, d, x, true) : 0; let used = 0;
+      own.filter(t => E.onDay(t, d)).sort((a, b) => (a.seq || 0) - (b.seq || 0)).forEach(t => { const m = E.minutesOn(t, d); if (!out.has(t.id) && used + m <= cap) used += m; else out.add(t.id); });
+    }
+    const hit = own.filter(t => out.has(t.id));
+    if (hit.length) await saveMany('tasks', hit.map(t => ({ id: t.id, patch: { planned_date: null, alloc: null, seq: 0, locked: false } })));
     let moved = 0;
     for (const m of new Set(hit.map(t => t.month))) { const r = runPlan(m, 'incremental', new Set(hit.filter(t => t.month === m).map(t => t.production_id).filter(Boolean))); moved += r.moved.length; await applyPlan(r); }
     return hit.length;
@@ -3191,15 +3217,16 @@
 
   /* ---------- Vue Jour : frise horaire de l'équipe ---------- */
   function pcDay(d, sets, m) {
-    const x = ctx(), td = today(), st0 = E.parseClock(cfg().day_start), all = list('tasks');
+    const x = ctx(), td = today(), st0 = E.parseClock(cfg().day_start), all = list('tasks'), L = lunchOf();
     const rows = pcScope().map(c => {
       const items = withTimes(dayTasks(c.id, d), d).map(it => ({ t: it.t, a: it.segs[0].a, b: it.segs[it.segs.length - 1].b, segs: it.segs }));
       const cap = E.capacityOn(c, d, x), load = E.loadOf(all, c.id, d).total, full = E.capacityOn(c, d, x, true);
-      return { c, items, cap, full, load, ab: E.absenceOn(c.id, d, x) };
+      const ab = E.absenceOn(c.id, d, x), half = ab ? E.absHalf(ab) : ''; // V26.211 : absence d'une demi-journée
+      return { c, items, cap, full, load, ab, half, st: half === 'am' && L.b > L.a ? L.b : st0 };
     });
     let h0 = Math.min(PC.H0, Math.floor(st0 / 60) * 60), h1 = PC.H1;
-    const capEndOf = cap => { const sg = clockSegs(st0, cap); return sg[sg.length - 1].b; }, L = lunchOf();
-    rows.forEach(r => { r.items.forEach(i => { h1 = Math.max(h1, Math.ceil(i.b / 60) * 60); }); if (r.full) h1 = Math.max(h1, Math.ceil(capEndOf(r.full) / 60) * 60); });
+    const capEndOf = (cap, st) => { const sg = clockSegs(st === undefined ? st0 : st, cap); return sg[sg.length - 1].b; };
+    rows.forEach(r => { r.items.forEach(i => { h1 = Math.max(h1, Math.ceil(i.b / 60) * 60); }); if (r.full) h1 = Math.max(h1, Math.ceil(capEndOf(r.full, r.st) / 60) * 60); });
     h1 = Math.min(Math.max(h1, h0 + 60), 24 * 60);
     const span = h1 - h0, hours = span / 60, pos = v => ((v - h0) / span * 100).toFixed(3) + '%';
     const head = '<div class="pc-row pc-head"><div class="pc-who pc-who-h"><b>' + (S.planAll ? 'Équipe' : 'Planning') + '</b><span>' + rows.length + ' personne' + (rows.length > 1 ? 's' : '') + '</span></div><div class="pc-hours">'
@@ -3210,13 +3237,15 @@
       + '<div class="pc-unpl-list" data-keep="pc-unpl" data-drop="unpl">' + (un.length ? un.map(t => pcCard(t, null, { who: S.planAll })).join('') : '<span class="pc-unpl-empty">Glissez ici une tâche pour la remettre « à affecter »</span>') + '</div></div>' : '';
     const body = rows.map(r => {
       const f = pcFill(r.load, r.cap), hol = x.settings.holidays && E.holidayName(d), off = r.cap <= 0;
-      const offLbl = hol ? 'Férié · ' + hol : r.ab && (r.ab.minutes === null || r.ab.minutes === undefined || r.ab.minutes === '') ? absLabel(r.ab) : r.c.kind === 'apprenti' ? 'École / hors entreprise' : 'Non travaillé';
+      const offLbl = hol ? 'Férié · ' + hol : r.ab && !r.half && (r.ab.minutes === null || r.ab.minutes === undefined || r.ab.minutes === '') ? absLabel(r.ab) : r.c.kind === 'apprenti' ? 'École / hors entreprise' : 'Non travaillé';
       const shown = r.items.filter(i => pcMatch(i.t, pcState(i.t, d, i)));
-      const lastEnd = r.items.reduce((v, i) => Math.max(v, i.b), st0), capEnd = capEndOf(r.cap), resM = off ? 0 : Math.max(0, r.full - r.cap), fullEnd = resM ? capEndOf(r.full) : capEnd;
+      const lastEnd = r.items.reduce((v, i) => Math.max(v, i.b), r.st), capEnd = capEndOf(r.cap, r.st), resM = off ? 0 : Math.max(0, r.full - r.cap), fullEnd = resM ? capEndOf(r.full, r.st) : capEnd;
+      // V26.211 : journée non travaillée (école, absence, férié) grisée en entier ; demi-journée d'absence grisée sur le matin ou l'après-midi
+      const halfZ = !off && r.half && L.b > L.a ? (r.half === 'am' ? '<i class="pc-absz" style="left:' + pos(Math.max(h0, st0)) + ';width:' + ((L.a - Math.max(h0, st0)) / span * 100).toFixed(3) + '%"><span>' + esc(absLabel(r.ab)) + '</span></i>' : '<i class="pc-absz" style="left:' + pos(L.b) + ';right:0"><span>' + esc(absLabel(r.ab)) + '</span></i>') : '';
       // V26.206 : temps gardé pour les imprévus, en fin de journée (jamais planifié)
       const res = resM && fullEnd > capEnd ? '<i class="pc-res" style="left:' + pos(Math.min(capEnd, h1)) + ';width:' + ((Math.min(fullEnd, h1) - Math.min(capEnd, h1)) / span * 100).toFixed(3) + '%" title="Temps gardé pour les imprévus (appels, mails, questions) : ' + E.fmtMin(resM) + '"><span>' + (resM >= 50 ? 'Imprévus · ' : '') + E.fmtMin(resM) + '</span></i>' : '';
       const ghost = !off && capEnd > lastEnd && d >= td && !pcFiltered() ? '<div class="pc-free" style="left:' + pos(lastEnd) + ';width:' + ((capEnd - lastEnd) / span * 100).toFixed(3) + '%" title="Disponible : ' + E.fmtMin(Math.max(0, r.cap - r.load)) + '"><span>' + (r.cap - r.load >= 50 ? 'Disponible · ' : '') + E.fmtMin(Math.max(0, r.cap - r.load)) + '</span></div>' : '';
-      const zones = '<i class="pc-zone" style="left:0;width:' + pos(st0) + '"></i>' + (off || L.b <= L.a || L.b <= h0 || L.a >= h1 ? '' : '<i class="pc-lunch" style="left:' + pos(L.a) + ';width:' + ((L.b - L.a) / span * 100).toFixed(3) + '%"><span>Pause</span></i>') + (off ? '' : res + '<i class="pc-zone" style="left:' + pos(Math.min(fullEnd, h1)) + ';right:0"></i><i class="pc-capend' + (overAlert(r.load, r.cap) ? ' over' : '') + '" style="left:' + pos(Math.min(capEnd, h1)) + '"></i>');
+      const zones = (off ? '<i class="pc-offz"></i>' : '<i class="pc-zone" style="left:0;width:' + pos(st0) + '"></i>') + halfZ + (off || r.half || L.b <= L.a || L.b <= h0 || L.a >= h1 ? '' : '<i class="pc-lunch" style="left:' + pos(L.a) + ';width:' + ((L.b - L.a) / span * 100).toFixed(3) + '%"><span>Pause</span></i>') + (off ? '' : res + (r.half === 'pm' ? '' : '<i class="pc-zone" style="left:' + pos(Math.min(fullEnd, h1)) + ';right:0"></i>') + '<i class="pc-capend' + (overAlert(r.load, r.cap) ? ' over' : '') + '" style="left:' + pos(Math.min(capEnd, h1)) + '"></i>');
       return '<div class="pc-row' + (off ? ' off' : '') + '"><div class="pc-who">' + pcAv(r.c) + '<div class="pc-who-t"><b>' + esc(r.c.name) + (r.c.id === S.me.collaborator_id ? ' <small>moi</small>' : '') + '</b><span>' + esc(PC_KIND[r.c.kind] || '') + '</span>'
         + '<span class="pc-who-load"><b>' + E.fmtMin(r.load) + '</b>' + (r.cap ? ' / ' + E.fmtMin(r.cap) : '') + '<span class="lbl"> planifiées</span></span>' + (off && !r.load ? '' : pcBar(f, true) + '<span class="pc-who-f f-' + f.cls + '">' + esc(f.txt) + '</span>') + '</div></div>'
         + '<div class="pc-track" data-drop="' + d + '" data-dc="' + r.c.id + '">' + zones + (off ? '<span class="pc-off-l">' + esc(offLbl) + '</span>' : '') + ghost + shown.map(i => i.segs.map((sg, k) => pcBlock(i, d, h0, span, sg, k, i.segs.length)).join('')).join('') + '</div></div>';
@@ -3243,8 +3272,11 @@
         const f = pcFill(load, cap), ts = dayTasks(c.id, d).filter(t => pcMatch(t, pcState(t, d, null)));
         const hol = x.settings.holidays && E.holidayName(d), ab = E.absenceOn(c.id, d, x);
         const max = 6, more = ts.length - max;
-        return '<div class="pc-wcell' + (d === td ? ' today' : '') + (!cap && !load ? ' off' : '') + '" data-drop="' + d + '" data-dc="' + c.id + '">'
-          + (cap || load ? '<div class="pc-wcap" title="' + esc(E.fmtMin(load) + ' planifiées sur ' + E.fmtMin(cap) + ' · ' + f.txt) + '"><span><b>' + E.fmtMin(load) + '</b> / ' + E.fmtMin(cap) + '</span>' + pcBar(f, true) + '</div>' : '<div class="pc-off-l">' + esc(hol ? 'Férié' : ab ? absLabel(ab) : c.kind === 'apprenti' ? 'École' : 'Non travaillé') + '</div>')
+        return '<div class="pc-wcell' + (d === td ? ' today' : '') + (!cap ? ' off' : '') + '" data-drop="' + d + '" data-dc="' + c.id + '">'
+          // V26.211 : tâches posées un jour non travaillé → signalées, avec « Replacer »
+          + (!cap && load ? '<div class="pc-off-l warn">' + esc(hol ? 'Férié' : ab && !E.absHalf(ab) ? absLabel(ab) : c.kind === 'apprenti' ? 'École' : 'Non travaillé') + ' · ' + E.fmtMin(load) + ' à replacer' + (S.readonly ? '' : ' <button class="btn sm" data-act="off-replan" data-c="' + c.id + '">Replacer</button>') + '</div>'
+          : ab && E.absHalf(ab) ? '<div class="pc-half">' + esc(absLabel(ab)) + '</div>' : '')
+          + (cap ? '<div class="pc-wcap" title="' + esc(E.fmtMin(load) + ' planifiées sur ' + E.fmtMin(cap) + ' · ' + f.txt) + '"><span><b>' + E.fmtMin(load) + '</b> / ' + E.fmtMin(cap) + '</span>' + pcBar(f, true) + '</div>' : load ? '' : '<div class="pc-off-l">' + esc(hol ? 'Férié' : ab ? absLabel(ab) : c.kind === 'apprenti' ? 'École' : 'Non travaillé') + '</div>')
           + ts.slice(0, more > 0 ? max - 1 : max).map(t => pcCard(t, d)).join('') + (more > 0 ? '<button class="pc-more" data-act="teamcell" data-c="' + c.id + '" data-date="' + d + '">+ ' + (more + 1) + ' autres</button>' : '') + '</div>';
       }).join('');
       const f = pcFill(tl, tc);
@@ -4198,7 +4230,7 @@
     }).join('');
     return '<div class="pres-cal"><div class="row" style="margin-bottom:8px"><h3 style="margin:0">Jours de présence en entreprise</h3><span class="spacer"></span><button class="btn sm" data-act="pres-year" data-d="-1" aria-label="Année précédente">‹</button><b>' + y + '</b><button class="btn sm" data-act="pres-year" data-d="1" aria-label="Année suivante">›</button></div>'
       + '<p class="small muted" style="margin:0 0 8px">Cliquez un jour pour le marquer « en entreprise ». L\'apprenti n\'est planifié que ces jours-là (' + n + ' jour' + (n > 1 ? 's' : '') + ' en ' + y + ').' + (edit ? '' : ' Modifiable par un manager.') + '</p>'
-      + (edit ? '<div class="row" style="gap:6px;margin-bottom:10px;flex-wrap:wrap"><span class="small muted">Tous les</span>' + DAYS.slice(0, 5).map((w, i) => '<button class="btn sm" data-act="pres-dow" data-w="' + (i + 1) + '" title="Cocher / décocher tous les ' + w + 's de ' + y + '">' + DAYS_S[i] + '</button>').join('') + '<button class="btn sm danger" data-act="pres-clear">Tout effacer ' + y + '</button></div>' : '')
+      + (edit ? '<div class="row" style="gap:6px;margin-bottom:10px;flex-wrap:wrap"><span class="small muted">Tous les</span>' + DAYS.slice(0, 5).map((w, i) => { const on = [...pres].some(d => d >= td && d.startsWith(y + '-') && E.dow(d) === i + 1); return '<button class="btn sm pres-w' + (on ? ' on' : '') + '" data-act="pres-dow" data-w="' + (i + 1) + '" aria-pressed="' + on + '" title="' + (on ? 'Retirer tous les ' + w + 's à venir de ' + y + ' (école)' : 'Mettre tous les ' + w + 's à venir de ' + y + ' en entreprise') + '">' + (on ? ic('check', 'sm') : '') + DAYS_S[i] + '</button>'; }).join('') + '<button class="btn sm danger" data-act="pres-clear">Tout effacer ' + y + '</button></div>' : '')
       + '<div class="pc-y">' + grid + '</div></div>';
   }
   function sheetCollab(s) {    const isNew = !s.id, c = isNew ? s.draft : S.data.collaborators.get(s.id);
@@ -4219,8 +4251,8 @@
         + '<div><h3 style="margin-bottom:8px">Congés, absences, formations</h3>' + (abs.length ? '<table class="t"><tbody>' + abs.map(a => '<tr><td>' + esc(absLabel(a)) + '</td><td>' + fDMY(a.date_from) + (a.date_to !== a.date_from ? ' → ' + fDMY(a.date_to) : '') + '</td><td class="small muted">' + esc(a.note || '') + '</td><td class="num"><button class="btn sm danger" data-act="abs-del" data-id="' + a.id + '">✕</button></td></tr>').join('') + '</tbody></table>' : '<div class="empty">Aucune.</div>')
         + '<div class="form" style="margin-top:10px"><label class="f"><span>Du</span><input type="date" id="abs-from"></label><label class="f"><span>Au</span><input type="date" id="abs-to"></label>'
         + '<label class="f"><span>Type</span><select id="abs-kind">' + ABS_KINDS.map(k => '<option value="' + k[0] + '">' + k[1] + '</option>').join('') + '</select></label>'
-        + '<label class="f"><span>Durée / jour (vide = journée)</span><input type="text" id="abs-min" placeholder="ex. 3h30"></label><label class="f"><span>Précision (ex. séminaire, réunion d\'équipe)</span><input type="text" id="abs-note" placeholder="Formation TVA, réunion interne…"></label></div>'
-        + '<div class="row" style="margin-top:8px"><button class="btn" data-act="abs-add" data-id="' + c.id + '">+ Ajouter l\'indisponibilité</button><span class="small muted">Pensez à replanifier le mois ensuite.</span></div></div>' : '')
+        + absPartField() + '<label class="f"><span>Précision (ex. séminaire, réunion d\'équipe)</span><input type="text" id="abs-note" placeholder="Formation TVA, réunion interne…"></label></div>'
+        + '<div class="row" style="margin-top:8px"><button class="btn" data-act="abs-add" data-id="' + c.id + '">+ Ajouter l\'indisponibilité</button><span class="small muted">Les dossiers prévus ces jours-là sont replacés automatiquement.</span></div></div>' : '')
       + '</div><div class="sheet-f">' + (isNew ? '<button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="collab-create">Créer</button>' : '<button class="btn danger" data-act="collab-del" data-id="' + c.id + '">Supprimer</button><span class="spacer"></span><span class="small muted">Enregistrement automatique</span><button class="btn" data-act="close">Fermer</button>') + '</div>';
   }
 
@@ -4502,7 +4534,7 @@
     const c = S.sheet && S.sheet.id ? collabOf(S.sheet.id) : null; if (!c || !(isAdmin() || isManager())) return;
     const set = new Set(c.presence_dates || []); fn(set);
     const r = await saveUpdate('collaborators', c.id, { presence_dates: [...set].sort() }, { quiet: true, history: { action: 'collaborateur', entity: 'collaborator', entity_id: c.id, detail: { text: c.name + ' : jours de présence modifiés' } } });
-    if (r === 'ok') renderSheet();
+    if (r === 'ok') { renderSheet(); replanOffDays(c.id); } // V26.211 : les tâches posées un jour d'école sont replacées
   }
   async function saveCollabField(c, k, v) {
     let val; try { val = parseField(k, v); } catch (e) { toast(e.message, 'warn'); renderSheet(); return; }
@@ -5738,17 +5770,20 @@
     'pres-dow': el => presSave(set => {
       const y = S.presYear || Number(today().slice(0, 4)), w = Number(el.dataset.w);
       const ds = E.rangeDates(y + '-01-01', y + '-12-31').filter(d => E.dow(d) === w && !E.holidayName(d));
-      const all = ds.every(d => set.has(d)); ds.forEach(d => all ? set.delete(d) : set.add(d));
+      // V26.211 : bouton à deux états — « coché » dès qu'un de ces jours (à venir) est en entreprise ; un clic le décoche entièrement
+      const on = ds.some(d => d >= today() && set.has(d)); ds.forEach(d => on ? set.delete(d) : (d >= today() && set.add(d)));
     }),
     'pres-clear': async el => { const y = String(S.presYear || today().slice(0, 4)); if (!await confirmBox('Effacer les jours de présence', '<p>Tous les jours de présence de ' + y + ' seront effacés.</p>', 'Effacer', true)) return; presSave(set => [...set].filter(d => d.startsWith(y + '-')).forEach(d => set.delete(d))); },
-    'abs-add': async el => {      const from = $('#abs-from').value, to = $('#abs-to').value || from, kind = $('#abs-kind').value, mt = $('#abs-min').value.trim(), note = $('#abs-note').value.trim();
+    'abs-add': async el => {      const from = $('#abs-from').value, to = $('#abs-to').value || from, part = ($('#abs-part') || {}).value || '', kind = $('#abs-kind').value + (part === 'am' || part === 'pm' ? '|' + part : ''), mt = part === 'h' ? $('#abs-min').value.trim() : '', note = $('#abs-note').value.trim();
+      if (part === 'h' && !mt) { toast('Indiquez la durée (ex. 2h).', 'warn'); return; }
       if (!from) { toast('Indiquez la date de début.', 'warn'); return; }
-      if (kind === 'autre' && !note) { toast('Précisez le motif de l\'indisponibilité (ex. séminaire).', 'warn'); return; }
+      if (kind.split('|')[0] === 'autre' && !note) { toast('Précisez le motif de l\'indisponibilité (ex. séminaire).', 'warn'); return; }
       if (to < from) { toast('La date de fin précède la date de début.', 'warn'); return; }
       const minutes = mt ? E.parseDuration(mt) : null;
       if (mt && isNaN(minutes)) { toast('Durée illisible.', 'warn'); return; }
       try { await saveInsert('absences', [{ id: P.uuid(), collaborator_id: el.dataset.id, date_from: from, date_to: to, kind, minutes, note: note || null }]); hist('collaborateur', { entity: 'collaborator', entity_id: el.dataset.id, detail: { text: 'Indisponibilité ' + fDMY(from) + ' → ' + fDMY(to) } }); const n = await replanAbsence(el.dataset.id, from, to); toast('Indisponibilité ajoutée' + (n ? ' : ' + n + ' dossier(s) replacé(s) sur d\'autres jours.' : '.'), 'ok'); render(); } catch (e) { /* affiché */ }
     },
+    'off-replan': el => replanOffDays(el.dataset.c).then(n => { if (!n) toast('Rien à replacer.', 'ok', null, 2500); }), // V26.211
     'abs-del': async el => { if (await saveRemove('absences', el.dataset.id)) toast('Indisponibilité supprimée.', 'ok'); },
     'user-new': () => openSheet({ type: 'user', draft: { name: '', email: '', role: 'collab', collaborator_id: null, active: true } }),
     'start-edit': () => { if (isManager() && !S.readonly) askStartMonth(true); }, // V26.169 : revenir sur le mois de début si on s'est trompé
@@ -5813,7 +5848,7 @@
       const d = Number(el.dataset.d), days = new Set(c.work_days || []); if (el.checked) days.add(d); else days.delete(d);
       const wd = [...days].sort();
       if (!s.id) { s.draft.work_days = wd; renderSheet(); return; }
-      saveUpdate('collaborators', c.id, { work_days: wd }, { history: { action: 'collaborateur', entity: 'collaborator', entity_id: c.id, detail: { text: c.name + ' : jours travaillés' } } });
+      saveUpdate('collaborators', c.id, { work_days: wd }, { history: { action: 'collaborateur', entity: 'collaborator', entity_id: c.id, detail: { text: c.name + ' : jours travaillés' } } }).then(r => { if (r === 'ok') replanOffDays(c.id); });
     },
     'u-field': el => {
       const s = S.sheet, k = el.dataset.k, v = el.type === 'checkbox' ? el.checked : (el.value || (k === 'collaborator_id' ? null : ''));
@@ -5835,6 +5870,7 @@
       const u = S.data.app_users.get(s.id); if (!u) return;
       if (await setUserStart(u.email, el.value)) toast('Début d\'utilisation de ' + u.name + ' : ' + (el.value ? fMonth(el.value) : 'comme le cabinet') + '.', 'ok', null, 3000);
     },
+    'abs-part': el => { const i = $('#abs-min'); if (i) i.parentNode.style.display = el.value === 'h' ? '' : 'none'; }, // V26.211
     'co-hours': el => { // V26.208 : horaires d'un jour de la semaine
       const s = S.sheet, c = s && S.data.collaborators.get(s.id); if (!c) return;
       const z = String(el.value).trim(), v = z === '' || /^0+$/.test(z) ? 0 : E.parseDuration(z);

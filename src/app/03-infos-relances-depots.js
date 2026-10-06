@@ -136,7 +136,12 @@
   /* Week-end : on bascule sur le lundi suivant (le samedi et le dimanche n'existent pas dans l'outil) */
   function weekday(d) { while (E.dow(d) >= 6) d = E.addDays(d, 1); return d; }
   const ABS_KINDS = [['conge', 'Congés'], ['absence', 'Absence'], ['formation', 'Formation'], ['reunion', 'Réunion interne'], ['autre', 'Autre (préciser)']];
-  function absLabel(a) { const k = a.kind === 'autre' && a.note ? a.note : (Object.fromEntries(ABS_KINDS)[a.kind] || 'Absence').replace(' (préciser)', ''); return k + (a.minutes ? ' (' + E.fmtMin(a.minutes) + ')' : ' (journée)'); }
+  // V26.211 : demi-journée stockée dans le type (« conge|am » / « conge|pm »), sans migration
+  const absKind = a => String((a && a.kind) || '').split('|')[0];
+  const ABS_HALF = { am: 'matin', pm: 'après-midi' };
+  function absLabel(a) { const kd = absKind(a), h = E.absHalf(a), k = kd === 'autre' && a.note ? a.note : (Object.fromEntries(ABS_KINDS)[kd] || 'Absence').replace(' (préciser)', ''); return k + (h ? ' (' + ABS_HALF[h] + ')' : a.minutes ? ' (' + E.fmtMin(a.minutes) + ')' : ' (journée)'); }
+  const absPartField = () => '<label class="f"><span>Durée</span><select id="abs-part" data-ch="abs-part"><option value="">Journée entière</option><option value="am">Matin</option><option value="pm">Après-midi</option><option value="h">Durée précise…</option></select></label>'
+    + '<label class="f" style="display:none"><span>Heures d\'absence par jour</span><input type="text" id="abs-min" placeholder="ex. 3h30"></label>';
   const AL_ICON = { projection: ['users', 'r'], overload: ['flame', 'r'], near: ['gauge', 'o'], due: ['clock', 'o'], unplanned: ['alert', 'o'], late: ['alert', 'r'], received: ['inbox', 'b'] };
   function alertList(al, max) {
     if (!al.length) return '<div class="empty">Aucune alerte — tout est sous contrôle.</div>';

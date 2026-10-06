@@ -497,3 +497,22 @@ html[data-cur="noir"] .tasks .swipe > .task:hover { box-shadow: inset 0 0 0 1.5p
 .rc-t th:nth-child(3) .th-f, .rc-t th:nth-child(4) .th-f { width: auto !important; max-width: 150px; min-width: 0; }
 .rc-t td:nth-child(4) .rc-go { white-space: normal; }
 .rc-t th:nth-child(6) { width: 40%; }
+
+/* V26.211 — jours non travaillés (école, absence, férié) : toute la journée en gris plus soutenu ; demi-journées d'absence */
+.pc-track .pc-offz { position: absolute; inset: 0; z-index: 0; pointer-events: none; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--text) 10%, transparent) 0 1px, transparent 1px 7px), color-mix(in srgb, var(--text) 11%, transparent); }
+.pc-row.off .pc-off-l { z-index: 1; font-weight: 600; color: color-mix(in srgb, var(--text) 62%, transparent); font-size: 12.5px; }
+.pc-track .pc-absz { position: absolute; top: 0; bottom: 0; z-index: 0; pointer-events: none; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--text) 10%, transparent) 0 1px, transparent 1px 7px), color-mix(in srgb, var(--text) 11%, transparent); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.pc-track .pc-absz span { font-size: 12px; font-weight: 600; font-style: italic; color: color-mix(in srgb, var(--text) 62%, transparent); white-space: nowrap; padding: 0 6px; }
+.pc-wcell.off { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--text) 9%, transparent) 0 1px, transparent 1px 7px), color-mix(in srgb, var(--text) 9%, transparent) !important; }
+.pc-wcell.off .pc-off-l, .pc-wcell .pc-off-l.warn { font-weight: 600; font-style: italic; color: color-mix(in srgb, var(--text) 62%, transparent); }
+.pc-wcell .pc-off-l.warn { color: var(--bad); font-style: normal; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pc-wcell .pc-half { font-size: 11px; font-weight: 600; font-style: italic; color: color-mix(in srgb, var(--text) 60%, transparent); padding: 2px 2px 0; }
+
+/* V26.211 — Suivi TVA : cartes 30 % moins hautes, texte adapté */
+#view .carousel[data-keep="kpi-fil"] > .kpi { padding: 6px 12px !important; min-height: 0 !important; }
+#view .carousel[data-keep="kpi-fil"] > .kpi .kpi-h { font-size: 12px; }
+#view .carousel[data-keep="kpi-fil"] > .kpi .kpi-h .ibox { width: 20px !important; height: 20px !important; min-width: 20px; border-radius: 6px; }
+#view .carousel[data-keep="kpi-fil"] > .kpi .kpi-h .ibox svg { width: 11px; height: 11px; }
+#view .carousel[data-keep="kpi-fil"] > .kpi .v { font-size: 17px !important; }
+#view .carousel[data-keep="kpi-fil"] > .kpi .foot { font-size: 11px; }
+#view .carousel[data-keep="kpi-fil"] > .kpi .foot .delta { padding: 0 6px; font-size: 10.5px; }

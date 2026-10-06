@@ -187,8 +187,12 @@
     if (ctx.settings.holidays && holidayName(date)) return 0;
     if (collab.kind === 'apprenti' && !presenceSet(collab).has(date)) return 0; // apprenti : uniquement ses jours en entreprise
     let cap = baseOn(collab, date, ctx.settings);
+    const base = cap;
     for (const a of ctx.absByCollab.get(collab.id) || []) {
       if (a.date_from <= date && date <= (a.date_to || a.date_from)) {
+        // V26.211 : demi-journée (type « conge|am » = matin, « conge|pm » = après-midi)
+        const half = absHalf(a);
+        if (half) { const am = morningMin(base, ctx.settings); cap -= half === 'am' ? am : base - am; continue; }
         if (a.minutes === null || a.minutes === undefined || a.minutes === '') return 0;
         cap -= Number(a.minutes) || 0;
       }
@@ -216,6 +220,9 @@
   function baseOn(collab, date, settings) { const w = dow(date); return w <= 5 ? weekHours(collab, settings)[w - 1] : 0; }
   /* V26.206 — Dossier « en attente du client » : retiré du planning jusqu'à la réponse */
   const onHold = p => !!(p && p.filing && p.filing.wait);
+  /* V26.211 — Demi-journées d'absence : le matin va du début de journée à la pause déjeuner */
+  const absHalf = a => { const h = String((a && a.kind) || '').split('|')[1]; return h === 'am' || h === 'pm' ? h : ''; };
+  const morningMin = (base, settings) => Math.max(0, Math.min(base, parseClock((settings || {}).lunch_start || '12:30') - parseClock((settings || {}).day_start || '09:00')));
   function absenceOn(collabId, date, ctx) {
     return (ctx.absByCollab.get(collabId) || []).find(a => a.date_from <= date && date <= (a.date_to || a.date_from)) || null;
   }
@@ -944,7 +951,7 @@
     pad, ymd, parseYmd, addDays, dow, daysInMonth, dateInMonth, addMonths, monthDates, rangeDates, startOfWeek, daysBetween, windowOf,
     easter, holidays, holidayName,
     fmtMin, fmtClock, parseClock, parseDuration, parseDay, parsePriority, parseFrequency,
-    makeCtx, capacityOn, reserveOf, weekHours, CONTRACT, onHold, absenceOn, clientApplies, buildMonth, plan, clientTime, productionTask, projection, suggestTransfers, hasAlloc, segs, minutesOn, endDate, onDay, spread, loadOf, levelOf, productionStatus, alerts, dashboard,
+    makeCtx, capacityOn, absHalf, morningMin, reserveOf, weekHours, CONTRACT, onHold, absenceOn, clientApplies, buildMonth, plan, clientTime, productionTask, projection, suggestTransfers, hasAlloc, segs, minutesOn, endDate, onDay, spread, loadOf, levelOf, productionStatus, alerts, dashboard,
     isReceived, freezeEnd, learn, predictReception, capacityRisk, rebalance, monthsBetween, isWorkday, nextWorkday, dashboardFor, buildDashboards, milestones
   };
 })(typeof window !== 'undefined' ? window : globalThis);

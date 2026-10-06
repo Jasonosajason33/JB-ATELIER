@@ -239,7 +239,7 @@
     const c = S.sheet && S.sheet.id ? collabOf(S.sheet.id) : null; if (!c || !(isAdmin() || isManager())) return;
     const set = new Set(c.presence_dates || []); fn(set);
     const r = await saveUpdate('collaborators', c.id, { presence_dates: [...set].sort() }, { quiet: true, history: { action: 'collaborateur', entity: 'collaborator', entity_id: c.id, detail: { text: c.name + ' : jours de présence modifiés' } } });
-    if (r === 'ok') renderSheet();
+    if (r === 'ok') { renderSheet(); replanOffDays(c.id); } // V26.211 : les tâches posées un jour d'école sont replacées
   }
   async function saveCollabField(c, k, v) {
     let val; try { val = parseField(k, v); } catch (e) { toast(e.message, 'warn'); renderSheet(); return; }

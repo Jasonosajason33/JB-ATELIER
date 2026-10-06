@@ -249,7 +249,7 @@
   function absenceForm(cid) {
     return '<div class="form" style="margin-top:10px"><label class="f"><span>Du</span><input type="date" id="abs-from"></label><label class="f"><span>Au</span><input type="date" id="abs-to"></label>'
       + '<label class="f"><span>Type</span><select id="abs-kind">' + ABS_KINDS.map(k => '<option value="' + k[0] + '">' + k[1] + '</option>').join('') + '</select></label>'
-      + '<label class="f"><span>Durée / jour (vide = journée)</span><input type="text" id="abs-min" placeholder="ex. 3h30"></label><label class="f"><span>Précision (ex. séminaire, réunion d\'équipe)</span><input type="text" id="abs-note" placeholder="Formation TVA, réunion interne…"></label></div>'
+      + absPartField() + '<label class="f"><span>Précision (ex. séminaire, réunion d\'équipe)</span><input type="text" id="abs-note" placeholder="Formation TVA, réunion interne…"></label></div>'
       + '<div class="row" style="margin-top:8px"><button class="btn primary" data-act="abs-add" data-id="' + cid + '">+ Ajouter</button><span class="small muted">Les dossiers prévus ces jours-là sont replacés automatiquement.</span></div>';
   }
   function myAbsenceCard() {
@@ -260,9 +260,28 @@
       + absenceForm(cid) + '</div>';
   }
   /* Après une absence : les dossiers prévus ces jours-là sont retirés puis replacés (le reste du planning ne bouge pas) */
+  /* V26.211 — Tâches posées un jour où la personne n'est plus disponible (école, jour non travaillé, absence) :
+   * retirées de ce jour (et déverrouillées), puis replacées par le planificateur. */
+  async function replanOffDays(cid, quiet) {
+    const c = collabOf(cid); if (!c || S.readonly) return 0;
+    const x = ctx(), td = today();
+    const hit = list('tasks').filter(t => t.collaborator_id === cid && !t.done && t.planned_date && canEditTask(t) && E.segs(t).some(s => s.d >= td && E.capacityOn(c, s.d, x, true) <= 0));
+    if (!hit.length) return 0;
+    await saveMany('tasks', hit.map(t => ({ id: t.id, patch: { planned_date: null, alloc: null, seq: 0, locked: false } })));
+    for (const m of new Set(hit.map(t => t.month))) await applyPlan(runPlan(m, 'incremental', new Set(hit.filter(t => t.month === m).map(t => t.production_id).filter(Boolean))));
+    if (!quiet) toast(hit.length + ' tâche' + (hit.length > 1 ? 's' : '') + ' de ' + c.name + ' replacée' + (hit.length > 1 ? 's' : '') + ' : elle' + (hit.length > 1 ? 's' : '') + ' étai' + (hit.length > 1 ? 'ent' : 't') + ' prévue' + (hit.length > 1 ? 's' : '') + ' un jour où ' + c.name + ' n\'est pas disponible.', 'ok', null, 5000);
+    return hit.length;
+  }
   async function replanAbsence(cid, from, to) {
-    const hit = list('tasks').filter(t => t.collaborator_id === cid && !t.done && !t.locked && E.segs(t).some(s => s.d >= from && s.d <= to));
-    if (hit.length) await saveMany('tasks', hit.map(t => ({ id: t.id, patch: { planned_date: null, alloc: null, seq: 0 } })));
+    // V26.211 : chaque jour de l'absence, on garde les tâches (même verrouillées) qui tiennent dans le temps restant
+    // (demi-journée : la moitié de la journée) ; les autres sont retirées, déverrouillées et replacées.
+    const c = collabOf(cid), x = ctx(), own = list('tasks').filter(t => t.collaborator_id === cid && !t.done && canEditTask(t)), out = new Set();
+    for (let d = from; d <= to; d = E.addDays(d, 1)) {
+      const cap = c ? E.capacityOn(c, d, x, true) : 0; let used = 0;
+      own.filter(t => E.onDay(t, d)).sort((a, b) => (a.seq || 0) - (b.seq || 0)).forEach(t => { const m = E.minutesOn(t, d); if (!out.has(t.id) && used + m <= cap) used += m; else out.add(t.id); });
+    }
+    const hit = own.filter(t => out.has(t.id));
+    if (hit.length) await saveMany('tasks', hit.map(t => ({ id: t.id, patch: { planned_date: null, alloc: null, seq: 0, locked: false } })));
     let moved = 0;
     for (const m of new Set(hit.map(t => t.month))) { const r = runPlan(m, 'incremental', new Set(hit.filter(t => t.month === m).map(t => t.production_id).filter(Boolean))); moved += r.moved.length; await applyPlan(r); }
     return hit.length;
