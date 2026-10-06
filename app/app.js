@@ -3973,7 +3973,20 @@
       add(slow.length ? 'warn' : 'ok', 'Rapidité', slow.length ? slow.length + ' écran(s) lent(s) sur cet appareil' : 'Écrans rapides sur cet appareil', res.map(r => r.lbl + ' ' + (r.ms < 0 ? 'erreur' : r.ms + ' ms')).join(' · ') + (slow.length ? ' — au-delà de 300 ms, signalez-le-moi.' : mid.length ? ' — correct.' : ' — excellent (moins de 120 ms).'));
     })();
     // 8. V26.110 : page des tests automatiques présente sur le site ?
-    try { const r = await fetch('tests/moteur.html', { method: 'HEAD', cache: 'no-store' }); if (r.ok) add('ok', 'Tests', 'Page des tests du moteur disponible', 'Cliquez sur « Lancer les tests du moteur » en bas de cette fenêtre (environ 10 secondes).'); else add('warn', 'Tests', 'Page des tests absente du site en ligne', 'Le dossier app/tests n\'a pas été mis en ligne : déposez le dossier app entier (avec son sous-dossier tests).'); } catch (e) { add('info', 'Tests', 'Présence de la page des tests non vérifiable', ''); }
+    // V26.216 : contrôle plus fiable — HEAD puis GET (certains hébergeurs refusent HEAD), adresse relative puis racine du site,
+    // et en cas d'échec l'adresse testée et la réponse du serveur sont indiquées.
+    try {
+      const urls = [...new Set([new URL('tests/moteur.html', location.href).href, new URL('/tests/moteur.html', location.href).href])];
+      let found = null, last = '';
+      for (const u of urls) {
+        for (const method of ['HEAD', 'GET']) {
+          try { const r = await fetch(u, { method, cache: 'no-store' }); const html = method === 'GET' ? await r.text() : ''; if (r.ok && (method === 'HEAD' || /suite\.js|moteur/i.test(html))) { found = u; break; } last = u + ' → ' + r.status + (r.ok ? ' (page de l\'application renvoyée à la place)' : ''); } catch (e) { last = u + ' → ' + (e && e.message || 'erreur réseau'); }
+        }
+        if (found) break;
+      }
+      if (found) add('ok', 'Tests', 'Page des tests du moteur disponible', 'Cliquez sur « Lancer les tests du moteur » en bas de cette fenêtre (environ 10 secondes).');
+      else add('warn', 'Tests', 'Page des tests absente du site en ligne', 'Adresse testée : ' + last + '. Vérifiez que le dépôt GitHub contient bien app/tests/moteur.html et app/tests/suite.js (déposez le dossier app entier, avec son sous-dossier tests). Les tests du moteur sont de toute façon lancés à chaque mise en ligne (node build.js) : cet avertissement ne bloque rien.');
+    } catch (e) { add('info', 'Tests', 'Présence de la page des tests non vérifiable', ''); }
     // 9. Appareil
     let ls = true; try { localStorage.setItem('planif-diag', '1'); localStorage.removeItem('planif-diag'); } catch (e) { ls = false; }
     add(ls ? 'ok' : 'warn', 'Appareil', ls ? 'Stockage du navigateur disponible' : 'Stockage du navigateur bloqué', ls ? 'Préférences et cache hors ligne fonctionnels.' : 'Navigation privée ou cookies bloqués : préférences non mémorisées.');
