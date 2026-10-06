@@ -654,16 +654,26 @@
     const r = await saveUpdate('productions', pid, { filing }, { history: { action: 'depot', entity: 'production', entity_id: pid, client_id: p.client_id, detail: { text: E.OBLIG_LABEL[code] + ' : ' + (via ? E.FILING_VIA[via] : 'dépôt annulé') } } });
     if (r === 'ok') toast(E.OBLIG_LABEL[code] + (via ? ' — ' + E.FILING_VIA[via].toLowerCase() + '.' : ' — dépôt annulé.'), 'ok', null, 2500);
   }
+  /* V26.210 : déclaration envoyée → validée par les impôts (une coche, réversible) — filing[code].valid = { at, by } */
+  async function setTvaValid(pid, codes) {
+    const p = S.data.productions.get(pid); if (!p || S.readonly) return;
+    const filing = Object.assign({}, p.filing || {}), cs = codes.filter(c => filing[c]); if (!cs.length) return;
+    const on = !cs.every(c => filing[c].valid);
+    cs.forEach(c => { const f = Object.assign({}, filing[c]); if (on) f.valid = { at: new Date().toISOString(), by: meName() || '' }; else delete f.valid; filing[c] = f; });
+    const c = clientOf(p.client_id) || {};
+    const r = await saveUpdate('productions', pid, { filing }, { history: { action: 'depot', entity: 'production', entity_id: pid, client_id: p.client_id, detail: { text: cs.map(k => E.OBLIG_LABEL[k]).join(', ') + (on ? ' : validée par les impôts' : ' : validation retirée') } } });
+    if (r === 'ok') toast(c.name + (on ? ' : TVA validée par les impôts.' : ' : validation retirée.'), 'ok', null, 2500);
+  }
   /* Tableau de bord : dépôts du mois */
   function filingRows(m) {
     const rows = [];
     list('productions').filter(p => p.month === m).forEach(p => {
       const c = clientOf(p.client_id); if (!c || !canSeeCollab(c.collaborator_id)) return;
-      E.obligations(c, m, cfg()).forEach(o => rows.push({ p, c, o, filed: !!(p.filing && p.filing[o.code]), ready: prodDone(p) }));
+      E.obligations(c, m, cfg()).forEach(o => rows.push({ p, c, o, filed: !!(p.filing && p.filing[o.code]), valid: !!(p.filing && p.filing[o.code] && p.filing[o.code].valid), ready: prodDone(p) }));
     });
     return rows;
   }
-  const FIL_K = { done: ['Déposés', r => r.filed], todo: ['À déposer', r => !r.filed && r.ready], prod: ['En production', r => !r.filed && !r.ready], late: ['Échéance dépassée', r => !r.filed && r.o.due < today()] };
+  const FIL_K = { done: ['Déposés', r => r.filed], valid: ['TVA validées', r => r.valid], todo: ['À déposer', r => !r.filed && r.ready], prod: ['En production', r => !r.filed && !r.ready], late: ['Échéance dépassée', r => !r.filed && r.o.due < today()] };
   /* V26.37 : détail d'une carte Dépôts (carte centrée) */
   function sheetFilDetail(s) {
     const K = FIL_K[s.k] || FIL_K.todo, sel = filingRows(s.m).filter(K[1]).sort((a, b) => a.o.due.localeCompare(b.o.due) || a.c.name.localeCompare(b.c.name, 'fr')), td = today();
@@ -771,10 +781,10 @@
     const td = today(), rows = filingRows(m);
     if (!rows.length) return '';
     const todo = rows.filter(r => !r.filed && r.ready).sort((a, b) => a.o.due.localeCompare(b.o.due));
-    const n = { done: rows.filter(r => r.filed).length, todo: todo.length, prod: rows.filter(r => !r.filed && !r.ready).length, late: rows.filter(r => !r.filed && r.o.due < td).length };
-    const kp = (i, icon, box, label, val, foot) => '<div class="kpi anim-in kpi-click" style="--i:' + i + '" data-act="fil-detail" data-m="' + m + '" data-k="' + ['done', 'todo', 'prod', 'late'][i] + '" role="button" tabindex="0"><div class="kpi-h"><span class="ibox ' + box + '">' + ic(icon, 'sm') + '</span>' + label + '</div><div class="v" data-count="' + val + '" data-fmt="int" data-key="fil' + label + m + '">' + val + '</div><div class="foot">' + foot + '</div></div>';
+    const n = { done: rows.filter(r => r.filed).length, valid: rows.filter(r => r.valid).length, todo: todo.length, prod: rows.filter(r => !r.filed && !r.ready).length, late: rows.filter(r => !r.filed && r.o.due < td).length };
+    const kp = (i, icon, box, label, val, foot) => '<div class="kpi anim-in kpi-click" style="--i:' + i + '" data-act="fil-detail" data-m="' + m + '" data-k="' + ['done', 'valid', 'todo', 'prod', 'late'][i] + '" role="button" tabindex="0"><div class="kpi-h"><span class="ibox ' + box + '">' + ic(icon, 'sm') + '</span>' + label + '</div><div class="v" data-count="' + val + '" data-fmt="int" data-key="fil' + label + m + '">' + val + '</div><div class="foot">' + foot + '</div></div>';
     return '<div class="section-t"><h2>Suivi TVA</h2><span class="muted small">TVA, DEB et DES du mois</span></div>'
-      + '<div class="carousel desk-grid" style="--n:4" data-keep="kpi-fil">' + kp(0, 'check', 'g', 'Déposés', n.done, 'jedeclare.com ou impots.gouv') + kp(1, 'list', 'o', 'À déposer', n.todo, 'production terminée') + kp(2, 'clock', '', 'En production', n.prod, 'pas encore déposables') + kp(3, 'alert', n.late ? 'r' : 'g', 'Échéance dépassée', n.late, n.late ? '<span class="delta down">à régulariser</span>' : '<span class="delta up">aucune</span>') + '</div><div class="dots" data-dots></div>'
+      + '<div class="carousel desk-grid" style="--n:5" data-keep="kpi-fil">' + kp(0, 'check', 'g', 'Déposés', n.done, 'jedeclare ou impots.gouv') + kp(1, 'shield', 'g', 'TVA validées', n.valid, 'par les impôts') + kp(2, 'list', 'o', 'À déposer', n.todo, 'production terminée') + kp(3, 'clock', '', 'En production', n.prod, 'pas encore déposables') + kp(4, 'alert', n.late ? 'r' : 'g', 'Échéance dépassée', n.late, n.late ? '<span class="delta down">à régulariser</span>' : '<span class="delta up">aucune</span>') + '</div><div class="dots" data-dots></div>'
       + '<div class="frame anim-in tva-frame" style="margin-top:var(--gap)"><div class="frame-h">' + ic('list') + '<h2>TVA à déposer</h2>' + (todo.length ? '<span class="badge o">' + todo.length + '</span>' : '') + '</div><div class="inner">'
       + (todo.length ? filPager(todo.length) + '<div class="tasks">' + filPage(todo).map(r => { const j = E.daysBetween(td, r.o.due); return '<div class="info-row"><span class="ibox ' + (j < 0 ? 'r' : j <= cfg().due_soon_days ? 'o' : '') + '">' + ic('clock', 'sm') + '</span><div class="t"><b>' + esc(r.c.name) + ' — ' + r.o.label + '</b><span>échéance ' + fDM(r.o.due) + (j < 0 ? ' · dépassée' : j <= cfg().due_soon_days ? ' · J-' + j : '') + '</span></div><div class="ir">' + Object.keys(E.FILING_VIA).map(v => '<button data-act="file" data-pid="' + r.p.id + '" data-code="' + r.o.code + '" data-via="' + v + '"' + (S.readonly ? ' disabled' : '') + '>' + (v === 'jedeclare' ? 'jedeclare.com' : 'impots.gouv') + '</button>').join('') + '</div></div>'; }).join('') + '</div>'
         : '<div class="empty">Aucun dépôt en attente.</div>') + (todo.length > FIL_PER ? filPager(todo.length, true) : '') + '</div></div>';

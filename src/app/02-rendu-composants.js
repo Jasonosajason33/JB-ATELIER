@@ -198,6 +198,7 @@
   // V26.209 : le mois et les actions du mois (ex. « Replanifier le mois ») se placent sur la ligne des onglets
   const pilotTabs = right => { const tabs = isManager() ? '<div class="seg pilot-tabs" role="tablist">' + PILOT_TABS.map(t => '<button role="tab" class="' + (S.route === t[0] ? 'on' : '') + '" data-act="go-route" data-r="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>' : ''; return right ? '<div class="pilot-bar">' + tabs + '<span class="spacer"></span><div class="pilot-right">' + right + '</div></div>' : tabs; };
   // V26.175 : 4e thème « Iris » — clair, aéré, accent pervenche, animations premium (fichier design-iris.css)
+  ICONS.shield = '<path d="M12 3l7 3v5.5c0 4.4-3 8.1-7 9.5-4-1.4-7-5.1-7-9.5V6l7-3z"/><path d="M8.8 12.2l2.3 2.3 4.3-4.6"/>'; // V26.210 : TVA validée
   ICONS.drop = '<path d="M12 3.2c3.3 4.1 6 7.4 6 10.6a6 6 0 0 1-12 0c0-3.2 2.7-6.5 6-10.6z"/>';
   const THEMES = [['signature', 'Signature', 'sparkle'], ['clair', 'Clair', 'sun'], ['nuit', 'Aurora', 'moon'], ['iris', 'Iris', 'drop']];
   const THEME_ICON = { signature: 'sparkle', clair: 'sun', nuit: 'moon', iris: 'drop' };

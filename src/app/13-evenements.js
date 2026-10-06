@@ -61,6 +61,7 @@
     'lock-group': el => lockGroup(groupFromKey(el.dataset.key)),
     'ir-list': el => openSheet({ type: 'irList', wide: true, ids: (el.dataset.ids || '').split(',').filter(Boolean) }), // V26.197
     'co-hours-reset': () => { const c = S.sheet && S.data.collaborators.get(S.sheet.id); if (c) setHours(c, null, 'horaires du contrat'); },
+    'rc-valid': el => setTvaValid(el.dataset.pid, (el.dataset.codes || '').split(',').filter(Boolean)).then(() => { if (S.sheet) renderSheet(); }), // V26.210
     'wait-pick': el => { S.waitPick = el.dataset.pid; renderSheet(); }, // V26.206 : en attente du client
     'wait-set': el => { S.waitPick = null; setWait(el.dataset.pid, el.dataset.why).then(() => { if (S.sheet) renderSheet(); }); },
     'wait-end': el => endWait(el.dataset.pid).then(() => { if (S.sheet) renderSheet(); }),

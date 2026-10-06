@@ -478,3 +478,22 @@ html[data-cur="noir"] .tasks .swipe > .task:hover { box-shadow: inset 0 0 0 1.5p
 .pilot-bar .pilot-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pilot-bar + .synth, .pilot-bar ~ .section-t:first-of-type { margin-top: 8px !important; }
 @media (max-width: 640px) { .pilot-bar .spacer { display: none; } .pilot-bar .pilot-right { width: 100%; justify-content: space-between; } }
+
+/* V26.210 — Récap TVA : colonne « Validé » (coche verte : déclaration validée par les impôts) */
+.rc-t tr.rc-valid td { background: color-mix(in srgb, var(--ok) 18%, transparent); }
+.rc-t tr.rc-sent td { background: color-mix(in srgb, var(--info) 8%, transparent); }
+.rc-t th.rc-vh, .rc-t td.rc-v { text-align: center; width: 64px; }
+.rc-ok { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--text) 22%, transparent); background: transparent; color: transparent; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: background-color .15s, border-color .15s, color .15s; }
+.rc-ok:hover { border-color: var(--ok); color: color-mix(in srgb, var(--ok) 55%, transparent); }
+.rc-ok.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+.rc-ok svg { width: 14px; height: 14px; stroke-width: 2.6; }
+.rc-ok:disabled { cursor: default; opacity: .6; }
+/* V26.210 — Suivi TVA : 5 cartes sur une ligne, plus étroites (texte secondaire tronqué si besoin) */
+@media (min-width: 900px) { #view .carousel[data-keep="kpi-fil"] > .kpi { flex-wrap: nowrap !important; gap: 3px 10px !important; } #view .carousel[data-keep="kpi-fil"] > .kpi .kpi-h { white-space: nowrap; } }
+/* V26.210 — Récap TVA : colonnes « Date limite » et « Statut » resserrées, le commentaire prend la place libre */
+.rc-t { table-layout: auto; width: 100%; }
+.rc-t th:nth-child(3), .rc-t td:nth-child(3) { width: 1%; white-space: nowrap; }
+.rc-t th:nth-child(4), .rc-t td:nth-child(4) { width: 1%; white-space: nowrap; }
+.rc-t th:nth-child(3) .th-f, .rc-t th:nth-child(4) .th-f { width: auto !important; max-width: 150px; min-width: 0; }
+.rc-t td:nth-child(4) .rc-go { white-space: normal; }
+.rc-t th:nth-child(6) { width: 40%; }

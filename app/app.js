@@ -547,6 +547,7 @@
   // V26.209 : le mois et les actions du mois (ex. « Replanifier le mois ») se placent sur la ligne des onglets
   const pilotTabs = right => { const tabs = isManager() ? '<div class="seg pilot-tabs" role="tablist">' + PILOT_TABS.map(t => '<button role="tab" class="' + (S.route === t[0] ? 'on' : '') + '" data-act="go-route" data-r="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>' : ''; return right ? '<div class="pilot-bar">' + tabs + '<span class="spacer"></span><div class="pilot-right">' + right + '</div></div>' : tabs; };
   // V26.175 : 4e thème « Iris » — clair, aéré, accent pervenche, animations premium (fichier design-iris.css)
+  ICONS.shield = '<path d="M12 3l7 3v5.5c0 4.4-3 8.1-7 9.5-4-1.4-7-5.1-7-9.5V6l7-3z"/><path d="M8.8 12.2l2.3 2.3 4.3-4.6"/>'; // V26.210 : TVA validée
   ICONS.drop = '<path d="M12 3.2c3.3 4.1 6 7.4 6 10.6a6 6 0 0 1-12 0c0-3.2 2.7-6.5 6-10.6z"/>';
   const THEMES = [['signature', 'Signature', 'sparkle'], ['clair', 'Clair', 'sun'], ['nuit', 'Aurora', 'moon'], ['iris', 'Iris', 'drop']];
   const THEME_ICON = { signature: 'sparkle', clair: 'sun', nuit: 'moon', iris: 'drop' };
@@ -1556,16 +1557,26 @@
     const r = await saveUpdate('productions', pid, { filing }, { history: { action: 'depot', entity: 'production', entity_id: pid, client_id: p.client_id, detail: { text: E.OBLIG_LABEL[code] + ' : ' + (via ? E.FILING_VIA[via] : 'dépôt annulé') } } });
     if (r === 'ok') toast(E.OBLIG_LABEL[code] + (via ? ' — ' + E.FILING_VIA[via].toLowerCase() + '.' : ' — dépôt annulé.'), 'ok', null, 2500);
   }
+  /* V26.210 : déclaration envoyée → validée par les impôts (une coche, réversible) — filing[code].valid = { at, by } */
+  async function setTvaValid(pid, codes) {
+    const p = S.data.productions.get(pid); if (!p || S.readonly) return;
+    const filing = Object.assign({}, p.filing || {}), cs = codes.filter(c => filing[c]); if (!cs.length) return;
+    const on = !cs.every(c => filing[c].valid);
+    cs.forEach(c => { const f = Object.assign({}, filing[c]); if (on) f.valid = { at: new Date().toISOString(), by: meName() || '' }; else delete f.valid; filing[c] = f; });
+    const c = clientOf(p.client_id) || {};
+    const r = await saveUpdate('productions', pid, { filing }, { history: { action: 'depot', entity: 'production', entity_id: pid, client_id: p.client_id, detail: { text: cs.map(k => E.OBLIG_LABEL[k]).join(', ') + (on ? ' : validée par les impôts' : ' : validation retirée') } } });
+    if (r === 'ok') toast(c.name + (on ? ' : TVA validée par les impôts.' : ' : validation retirée.'), 'ok', null, 2500);
+  }
   /* Tableau de bord : dépôts du mois */
   function filingRows(m) {
     const rows = [];
     list('productions').filter(p => p.month === m).forEach(p => {
       const c = clientOf(p.client_id); if (!c || !canSeeCollab(c.collaborator_id)) return;
-      E.obligations(c, m, cfg()).forEach(o => rows.push({ p, c, o, filed: !!(p.filing && p.filing[o.code]), ready: prodDone(p) }));
+      E.obligations(c, m, cfg()).forEach(o => rows.push({ p, c, o, filed: !!(p.filing && p.filing[o.code]), valid: !!(p.filing && p.filing[o.code] && p.filing[o.code].valid), ready: prodDone(p) }));
     });
     return rows;
   }
-  const FIL_K = { done: ['Déposés', r => r.filed], todo: ['À déposer', r => !r.filed && r.ready], prod: ['En production', r => !r.filed && !r.ready], late: ['Échéance dépassée', r => !r.filed && r.o.due < today()] };
+  const FIL_K = { done: ['Déposés', r => r.filed], valid: ['TVA validées', r => r.valid], todo: ['À déposer', r => !r.filed && r.ready], prod: ['En production', r => !r.filed && !r.ready], late: ['Échéance dépassée', r => !r.filed && r.o.due < today()] };
   /* V26.37 : détail d'une carte Dépôts (carte centrée) */
   function sheetFilDetail(s) {
     const K = FIL_K[s.k] || FIL_K.todo, sel = filingRows(s.m).filter(K[1]).sort((a, b) => a.o.due.localeCompare(b.o.due) || a.c.name.localeCompare(b.c.name, 'fr')), td = today();
@@ -1673,10 +1684,10 @@
     const td = today(), rows = filingRows(m);
     if (!rows.length) return '';
     const todo = rows.filter(r => !r.filed && r.ready).sort((a, b) => a.o.due.localeCompare(b.o.due));
-    const n = { done: rows.filter(r => r.filed).length, todo: todo.length, prod: rows.filter(r => !r.filed && !r.ready).length, late: rows.filter(r => !r.filed && r.o.due < td).length };
-    const kp = (i, icon, box, label, val, foot) => '<div class="kpi anim-in kpi-click" style="--i:' + i + '" data-act="fil-detail" data-m="' + m + '" data-k="' + ['done', 'todo', 'prod', 'late'][i] + '" role="button" tabindex="0"><div class="kpi-h"><span class="ibox ' + box + '">' + ic(icon, 'sm') + '</span>' + label + '</div><div class="v" data-count="' + val + '" data-fmt="int" data-key="fil' + label + m + '">' + val + '</div><div class="foot">' + foot + '</div></div>';
+    const n = { done: rows.filter(r => r.filed).length, valid: rows.filter(r => r.valid).length, todo: todo.length, prod: rows.filter(r => !r.filed && !r.ready).length, late: rows.filter(r => !r.filed && r.o.due < td).length };
+    const kp = (i, icon, box, label, val, foot) => '<div class="kpi anim-in kpi-click" style="--i:' + i + '" data-act="fil-detail" data-m="' + m + '" data-k="' + ['done', 'valid', 'todo', 'prod', 'late'][i] + '" role="button" tabindex="0"><div class="kpi-h"><span class="ibox ' + box + '">' + ic(icon, 'sm') + '</span>' + label + '</div><div class="v" data-count="' + val + '" data-fmt="int" data-key="fil' + label + m + '">' + val + '</div><div class="foot">' + foot + '</div></div>';
     return '<div class="section-t"><h2>Suivi TVA</h2><span class="muted small">TVA, DEB et DES du mois</span></div>'
-      + '<div class="carousel desk-grid" style="--n:4" data-keep="kpi-fil">' + kp(0, 'check', 'g', 'Déposés', n.done, 'jedeclare.com ou impots.gouv') + kp(1, 'list', 'o', 'À déposer', n.todo, 'production terminée') + kp(2, 'clock', '', 'En production', n.prod, 'pas encore déposables') + kp(3, 'alert', n.late ? 'r' : 'g', 'Échéance dépassée', n.late, n.late ? '<span class="delta down">à régulariser</span>' : '<span class="delta up">aucune</span>') + '</div><div class="dots" data-dots></div>'
+      + '<div class="carousel desk-grid" style="--n:5" data-keep="kpi-fil">' + kp(0, 'check', 'g', 'Déposés', n.done, 'jedeclare ou impots.gouv') + kp(1, 'shield', 'g', 'TVA validées', n.valid, 'par les impôts') + kp(2, 'list', 'o', 'À déposer', n.todo, 'production terminée') + kp(3, 'clock', '', 'En production', n.prod, 'pas encore déposables') + kp(4, 'alert', n.late ? 'r' : 'g', 'Échéance dépassée', n.late, n.late ? '<span class="delta down">à régulariser</span>' : '<span class="delta up">aucune</span>') + '</div><div class="dots" data-dots></div>'
       + '<div class="frame anim-in tva-frame" style="margin-top:var(--gap)"><div class="frame-h">' + ic('list') + '<h2>TVA à déposer</h2>' + (todo.length ? '<span class="badge o">' + todo.length + '</span>' : '') + '</div><div class="inner">'
       + (todo.length ? filPager(todo.length) + '<div class="tasks">' + filPage(todo).map(r => { const j = E.daysBetween(td, r.o.due); return '<div class="info-row"><span class="ibox ' + (j < 0 ? 'r' : j <= cfg().due_soon_days ? 'o' : '') + '">' + ic('clock', 'sm') + '</span><div class="t"><b>' + esc(r.c.name) + ' — ' + r.o.label + '</b><span>échéance ' + fDM(r.o.due) + (j < 0 ? ' · dépassée' : j <= cfg().due_soon_days ? ' · J-' + j : '') + '</span></div><div class="ir">' + Object.keys(E.FILING_VIA).map(v => '<button data-act="file" data-pid="' + r.p.id + '" data-code="' + r.o.code + '" data-via="' + v + '"' + (S.readonly ? ' disabled' : '') + '>' + (v === 'jedeclare' ? 'jedeclare.com' : 'impots.gouv') + '</button>').join('') + '</div></div>'; }).join('') + '</div>'
         : '<div class="empty">Aucun dépôt en attente.</div>') + (todo.length > FIL_PER ? filPager(todo.length, true) : '') + '</div></div>';
@@ -5100,7 +5111,7 @@
    * Statut calculé automatiquement : Envoyé (dépôt noté) · Prêt à envoyer (tenue terminée) · En cours (pièces reçues, tenue commencée,
    * planifiée aujourd'hui ou réception partielle) · Planifié · À recevoir. Commentaire enregistré automatiquement. */
   const TVA_CODES = ['CA3', 'CA12', 'ACPT'];
-  const RECAP_ST = { sent: ['Envoyé', 'g'], ready: ['Prêt à envoyer', 'b'], doing: ['En cours', 'o'], planned: ['Planifié', 'k'], wait: ['À recevoir', 'r'] };
+  const RECAP_ST = { valid: ['Validé', 'g'], sent: ['Envoyé', 'b'], ready: ['Prêt à envoyer', 'b'], doing: ['En cours', 'o'], planned: ['Planifié', 'k'], wait: ['À recevoir', 'r'] };
   function recapRows(m) {
     const td = today(), rows = [];
     list('productions').filter(p => p.month === m).forEach(p => {
@@ -5109,12 +5120,14 @@
       const o = ob.sort((a, b) => a.due.localeCompare(b.due))[0], f = p.filing && p.filing[o.code];
       const ts = list('tasks').filter(t => t.production_id === p.id && t.kind !== 'info');
       let st;
-      if (f) st = 'sent';
+      const codes = ob.filter(x => p.filing && p.filing[x.code]).map(x => x.code), valid = !!codes.length && codes.every(k => p.filing[k].valid); // V26.210
+      if (f && valid) st = 'valid';
+      else if (f) st = 'sent';
       else if (ts.length && ts.every(t => t.done)) st = 'ready';
       else if (p.partial_date || ts.some(t => t.done) || (p.received_date && ts.some(t => t.planned_date && t.planned_date <= td))) st = 'doing';
       else if (p.received_date) st = 'planned';
       else st = 'wait';
-      rows.push({ p, c, o, f, st, plan: ts.map(t => t.planned_date).filter(Boolean).sort()[0] || null });
+      rows.push({ p, c, o, f, st, codes, valid, plan: ts.map(t => t.planned_date).filter(Boolean).sort()[0] || null });
     });
     return rows.sort((a, b) => a.o.due.localeCompare(b.o.due) || a.c.name.localeCompare(b.c.name, 'fr'));
   }
@@ -5137,17 +5150,19 @@
     const head = '<thead><tr><th>Dossier</th><th>Clôture</th>'
       + '<th class="num">' + thSel('due', 'Date limite', dues.map(d => [d, 'Date limite : le ' + Number(d.slice(8)) + (d < today() ? ' (dépassée)' : '') + ' (' + all.filter(r => r.o.due === d).length + ')']), v.due) + '</th>'
       + '<th>' + thSel('st', 'Statut', Object.keys(RECAP_ST).map(k => [k, 'Statut : ' + RECAP_ST[k][0] + ' (' + n(k) + ')']), flt === 'all' ? '' : flt) + '</th>'
+      + '<th class="rc-vh" title="Déclaration envoyée et validée par les impôts">Validé</th>'
       + '<th>' + thSel('note', 'Commentaire', [['with', 'Avec commentaire (' + withN + ')'], ['without', 'Sans commentaire (' + (all.length - withN) + ')']], v.note) + '</th></tr></thead>';
-    const statusTxt = r => r.st === 'sent' ? 'Envoyé le ' + fDMY(atDay(r.f.at)) : r.st === 'planned' && r.plan ? 'Planifié le ' + fDM(r.plan) : r.st === 'wait' ? 'À recevoir' + (r.p.expected_date ? ' (vers le ' + fDM(r.p.expected_date) + ')' : '') : RECAP_ST[r.st][0];
+    const statusTxt = r => r.st === 'valid' ? 'Envoyé le ' + fDMY(atDay(r.f.at)) : r.st === 'sent' ? 'Envoyé le ' + fDMY(atDay(r.f.at)) : r.st === 'planned' && r.plan ? 'Planifié le ' + fDM(r.plan) : r.st === 'wait' ? 'À recevoir' + (r.p.expected_date ? ' (vers le ' + fDM(r.p.expected_date) + ')' : '') : RECAP_ST[r.st][0];
     const body = all.length ? '<div class="scroll-x"><table class="t rc-t">' + head + '<tbody>'
       + (rows.length ? rows.map(r => '<tr class="rc-' + r.st + '"><td><b class="rc-n" data-act="rc-open" data-id="' + r.p.id + '">' + esc(r.c.name) + '</b><div class="small muted">' + esc((collabOf(r.c.collaborator_id) || {}).name || '') + ' · ' + r.o.label + '</div></td>'
-        + '<td class="nowrap">' + clotureLbl(r.c) + '</td><td class="num"><b>' + Number(r.o.due.slice(8)) + '</b>' + (r.st !== 'sent' && r.o.due < today() ? ' <span class="badge r">dépassée</span>' : '') + '</td>'
+        + '<td class="nowrap">' + clotureLbl(r.c) + '</td><td class="num"><b>' + Number(r.o.due.slice(8)) + '</b>' + (!r.f && r.o.due < today() ? ' <span class="badge r">dépassée</span>' : '') + '</td>'
         + '<td><span class="badge ' + RECAP_ST[r.st][1] + '">' + statusTxt(r) + '</span>' + (r.st === 'ready' && !S.readonly ? '<div class="ir rc-go">' + Object.keys(E.FILING_VIA).map(vv => '<button data-act="file" data-pid="' + r.p.id + '" data-code="' + r.o.code + '" data-via="' + vv + '">' + (vv === 'jedeclare' ? 'jedeclare.com' : 'impots.gouv') + '</button>').join('') + '</div>' : '') + '</td>'
+        + '<td class="rc-v">' + (r.f ? '<button class="rc-ok' + (r.valid ? ' on' : '') + '" data-act="rc-valid" data-pid="' + r.p.id + '" data-codes="' + r.codes.join(',') + '" title="' + (r.valid ? 'Validée par les impôts le ' + fDMY(atDay(r.p.filing[r.codes[0]].valid.at)) + (r.p.filing[r.codes[0]].valid.by ? ' par ' + esc(r.p.filing[r.codes[0]].valid.by) : '') + ' — cliquer pour retirer' : 'Cocher quand la déclaration envoyée est validée par les impôts') + '" aria-pressed="' + r.valid + '"' + (S.readonly ? ' disabled' : '') + '>' + ic('check', 'sm') + '</button>' : '<span class="faint">—</span>') + '</td>'
         + '<td class="rc-c"><input type="text" data-ch="rc-note" data-id="' + r.p.id + '" value="' + esc(r.p.tva_note || '') + '" placeholder="Ajouter un commentaire…" maxlength="240"' + (S.readonly ? ' disabled' : '') + '></td></tr>').join('')
-        : '<tr><td colspan="5"><div class="empty">Aucun dossier ne correspond aux filtres. <button class="btn sm" data-act="rc-reset">Effacer les filtres</button></div></td></tr>')
+        : '<tr><td colspan="6"><div class="empty">Aucun dossier ne correspond aux filtres. <button class="btn sm" data-act="rc-reset">Effacer les filtres</button></div></td></tr>')
       + '</tbody></table></div>'
       : '<div class="empty">Aucun dossier soumis à TVA ce mois-ci.</div>';
-    return sheetHead('Récap TVA — ' + fMonth(m), all.length + ' dossier(s)' + (v.filtered ? ' · ' + rows.length + ' affiché(s)' : '') + ' · ' + n('sent') + ' envoyé(s) · les commentaires s\'enregistrent automatiquement')
+    return sheetHead('Récap TVA — ' + fMonth(m), all.length + ' dossier(s)' + (v.filtered ? ' · ' + rows.length + ' affiché(s)' : '') + ' · ' + (n('sent') + n('valid')) + ' envoyé(s) · ' + n('valid') + ' validé(s) · les commentaires s\'enregistrent automatiquement')
       + '<div class="sheet-b">' + chips + body + '</div><div class="sheet-f"><span class="small muted" id="rc-saved"></span><span class="spacer"></span><button class="btn" data-act="rc-csv" title="' + (v.filtered ? 'Exporte les dossiers affichés (filtres appliqués)' : 'Exporte tous les dossiers') + '">⤓ Exporter (Excel)' + (v.filtered ? ' · ' + rows.length : '') + '</button><button class="btn" data-act="close">Fermer</button></div>';
   }
   async function saveRecapNote(el) {
@@ -5158,8 +5173,8 @@
   }
   async function recapCsv() {
     const XLSX = await needXLSX(), m = S.month, v = recapView(S.sheet && S.sheet.type === 'tvaRecap' ? S.sheet : null); // V26.165 : exporte ce qui est affiché (filtres)
-    const aoa = [['Nom dossier', 'Collaborateur', 'Déclaration', 'Clôture', 'Date limite', 'Statut', 'Commentaire']].concat(v.rows.map(r => [r.c.name, (collabOf(r.c.collaborator_id) || {}).name || '', r.o.label, clotureLbl(r.c), Number(r.o.due.slice(8)), r.st === 'sent' ? 'Envoyé le ' + fDMY(atDay(r.f.at)) : RECAP_ST[r.st][0], r.p.tva_note || '']));
-    const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [{ wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 12 }, { wch: 22 }, { wch: 40 }];
+    const aoa = [['Nom dossier', 'Collaborateur', 'Déclaration', 'Clôture', 'Date limite', 'Statut', 'Validé par les impôts', 'Commentaire']].concat(v.rows.map(r => [r.c.name, (collabOf(r.c.collaborator_id) || {}).name || '', r.o.label, clotureLbl(r.c), Number(r.o.due.slice(8)), r.f ? 'Envoyé le ' + fDMY(atDay(r.f.at)) : RECAP_ST[r.st][0], r.valid ? 'Oui — le ' + fDMY(atDay(r.p.filing[r.codes[0]].valid.at)) : '', r.p.tva_note || '']));
+    const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [{ wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 12 }, { wch: 22 }, { wch: 20 }, { wch: 40 }];
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Récap TVA'); XLSX.writeFile(wb, 'recap-tva-' + m + (v.filtered ? '-filtre' : '') + '.xlsx');
   }
   /* ====================== V26.111 : démo guidée (bouton « Démo ») ======================
@@ -5672,6 +5687,7 @@
     'lock-group': el => lockGroup(groupFromKey(el.dataset.key)),
     'ir-list': el => openSheet({ type: 'irList', wide: true, ids: (el.dataset.ids || '').split(',').filter(Boolean) }), // V26.197
     'co-hours-reset': () => { const c = S.sheet && S.data.collaborators.get(S.sheet.id); if (c) setHours(c, null, 'horaires du contrat'); },
+    'rc-valid': el => setTvaValid(el.dataset.pid, (el.dataset.codes || '').split(',').filter(Boolean)).then(() => { if (S.sheet) renderSheet(); }), // V26.210
     'wait-pick': el => { S.waitPick = el.dataset.pid; renderSheet(); }, // V26.206 : en attente du client
     'wait-set': el => { S.waitPick = null; setWait(el.dataset.pid, el.dataset.why).then(() => { if (S.sheet) renderSheet(); }); },
     'wait-end': el => endWait(el.dataset.pid).then(() => { if (S.sheet) renderSheet(); }),
