@@ -1151,7 +1151,8 @@
       const lanes = [];
       items.forEach(it => { let l = lanes.findIndex(end => end < it.a); if (l < 0) { l = lanes.length; lanes.push(-1); } lanes[l] = it.b; it.l = l; });
       const L = Math.max(1, lanes.length);
-      const bg = dates.map((d, i) => { const cap = E.capacityOn(c, d, x), l = E.loadOf(tasks, c.id, d).total; return '<div class="gbg' + (cap <= 0 ? ' off' : l > cap ? ' over' : '') + (d === td ? ' today' : '') + '" style="grid-column:' + (i + 2) + ';grid-row:1 / span ' + L + '"></div>'; }).join('');
+      const bg = dates.map((d, i) => { const cap = E.capacityOn(c, d, x), l = E.loadOf(tasks, c.id, d).total, ab = E.absenceOn(c.id, d, x), h = ab && cap > 0 ? E.absHalf(ab) : ''; // V26.211 : absences grisées (demi-journée : moitié gauche = matin, droite = après-midi)
+        return '<div class="gbg' + (cap <= 0 ? ' off' : l > cap ? ' over' : '') + (h ? ' h' + h : '') + (d === td ? ' today' : '') + '" style="grid-column:' + (i + 2) + ';grid-row:1 / span ' + L + '"' + (ab ? ' title="' + esc(absLabel(ab)) + '"' : cap <= 0 && c.kind === 'apprenti' ? ' title="École"' : '') + '></div>'; }).join('');
       const bars = items.map(it => {
         const t = it.t, cl = clientOf(t.client_id) || {}, p = S.data.productions.get(t.production_id), late = !t.done && E.endDate(t) < td;
         return '<div class="gbar k-' + t.kind + (t.done ? ' done' : '') + (p && !p.received_date && t.kind !== 'info' ? ' forecast' : '') + (late ? ' late' : '') + '" style="grid-column:' + (it.a + 2) + ' / ' + (it.b + 3) + ';grid-row:' + (it.l + 1) + '" data-act="task" data-id="' + t.id + '" title="' + esc(cl.name + ' — ' + E.KIND_LABEL[t.kind] + ' — ' + E.fmtMin(t.duration_min)) + '"><span>' + (t.kind === 'info' ? ic('mail', 'sm') : '') + esc(cl.name) + '</span><small>' + E.fmtMin(t.duration_min) + '</small></div>';
@@ -2831,8 +2832,9 @@
       const n = dayTasks(c.id, d).length, outwin = d < win.start || d > win.end;
       if (!outwin) { tot += l.total; capT += cap; }
       if (from && d < from) continue;
-      const hol = x.settings.holidays && E.holidayName(d);
-      cells += '<div class="mcell cell-' + (cap || l.total ? lv : 'off') + (outwin ? ' outwin' : '') + (d === td ? ' today' : '') + '" data-act="goday" data-date="' + d + '" data-drop="' + d + '" data-dc="' + c.id + '"><div class="dn"><span>' + Number(d.slice(8)) + '</span>' + (hol ? '<span title="' + esc(hol) + '">F</span>' : '') + '</div>'
+      const hol = x.settings.holidays && E.holidayName(d), ab = E.absenceOn(c.id, d, x), h = ab && cap > 0 ? E.absHalf(ab) : ''; // V26.211 : absences grisées
+      cells += '<div class="mcell cell-' + (cap || l.total ? lv : 'off') + (!cap ? ' is-off' : '') + (h ? ' h' + h : '') + (outwin ? ' outwin' : '') + (d === td ? ' today' : '') + '" data-act="goday" data-date="' + d + '" data-drop="' + d + '" data-dc="' + c.id + '"><div class="dn"><span>' + Number(d.slice(8)) + '</span>' + (hol ? '<span title="' + esc(hol) + '">F</span>' : '') + '</div>'
+        + (ab ? '<div class="abs-l">' + esc(absLabel(ab)) + '</div>' : !cap && c.kind === 'apprenti' && !hol ? '<div class="abs-l">École</div>' : '')
         + (l.total ? '<div class="hl">' + E.fmtMin(l.total) + '<span class="hide-m"> / ' + E.fmtMin(cap) + '</span></div><div class="cnt small">' + n + ' tâche' + (n > 1 ? 's' : '') + '</div>' : cap ? '<div class="small muted">libre<span class="hide-m"> · ' + E.fmtMin(cap) + '</span></div>' : '') + '</div>';
     }
     const unpl = list('tasks').filter(t => t.month === m && t.collaborator_id === c.id && !t.done && !t.planned_date);
@@ -3275,9 +3277,11 @@
         return '<div class="pc-wcell' + (d === td ? ' today' : '') + (!cap ? ' off' : '') + '" data-drop="' + d + '" data-dc="' + c.id + '">'
           // V26.211 : tâches posées un jour non travaillé → signalées, avec « Replacer »
           + (!cap && load ? '<div class="pc-off-l warn">' + esc(hol ? 'Férié' : ab && !E.absHalf(ab) ? absLabel(ab) : c.kind === 'apprenti' ? 'École' : 'Non travaillé') + ' · ' + E.fmtMin(load) + ' à replacer' + (S.readonly ? '' : ' <button class="btn sm" data-act="off-replan" data-c="' + c.id + '">Replacer</button>') + '</div>'
-          : ab && E.absHalf(ab) ? '<div class="pc-half">' + esc(absLabel(ab)) + '</div>' : '')
+          : ab && E.absHalf(ab) === 'am' ? '<div class="pc-wabs">' + esc(absLabel(ab)) + '</div><div class="pc-wpart">Après-midi</div>' : '')
           + (cap ? '<div class="pc-wcap" title="' + esc(E.fmtMin(load) + ' planifiées sur ' + E.fmtMin(cap) + ' · ' + f.txt) + '"><span><b>' + E.fmtMin(load) + '</b> / ' + E.fmtMin(cap) + '</span>' + pcBar(f, true) + '</div>' : load ? '' : '<div class="pc-off-l">' + esc(hol ? 'Férié' : ab ? absLabel(ab) : c.kind === 'apprenti' ? 'École' : 'Non travaillé') + '</div>')
-          + ts.slice(0, more > 0 ? max - 1 : max).map(t => pcCard(t, d)).join('') + (more > 0 ? '<button class="pc-more" data-act="teamcell" data-c="' + c.id + '" data-date="' + d + '">+ ' + (more + 1) + ' autres</button>' : '') + '</div>';
+          + (cap && ab && E.absHalf(ab) === 'pm' ? '<div class="pc-wpart">Matin</div>' : '')
+          + ts.slice(0, more > 0 ? max - 1 : max).map(t => pcCard(t, d)).join('') + (more > 0 ? '<button class="pc-more" data-act="teamcell" data-c="' + c.id + '" data-date="' + d + '">+ ' + (more + 1) + ' autres</button>' : '')
+          + (cap && ab && E.absHalf(ab) === 'pm' ? '<div class="pc-wabs pm">' + esc(absLabel(ab)) + '</div>' : '') + '</div>';
       }).join('');
       const f = pcFill(tl, tc);
       return '<div class="pc-wrow"><div class="pc-who">' + pcAv(c) + '<div class="pc-who-t"><b>' + esc(c.name) + (c.id === S.me.collaborator_id ? ' <small>moi</small>' : '') + '</b><span>' + esc(PC_KIND[c.kind] || '') + '</span>' + (tc || tl ? '<span class="pc-who-load"><b>' + E.fmtMin(tl) + '</b> / ' + E.fmtMin(tc) + '</span>' + pcBar(f, true) + '<span class="pc-who-f f-' + f.cls + '">' + esc(f.txt) + '</span>' : '<span class="pc-who-load">Non travaillé cette semaine</span>') + '</div></div>' + cells + '</div>';

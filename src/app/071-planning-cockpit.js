@@ -225,9 +225,11 @@
         return '<div class="pc-wcell' + (d === td ? ' today' : '') + (!cap ? ' off' : '') + '" data-drop="' + d + '" data-dc="' + c.id + '">'
           // V26.211 : tâches posées un jour non travaillé → signalées, avec « Replacer »
           + (!cap && load ? '<div class="pc-off-l warn">' + esc(hol ? 'Férié' : ab && !E.absHalf(ab) ? absLabel(ab) : c.kind === 'apprenti' ? 'École' : 'Non travaillé') + ' · ' + E.fmtMin(load) + ' à replacer' + (S.readonly ? '' : ' <button class="btn sm" data-act="off-replan" data-c="' + c.id + '">Replacer</button>') + '</div>'
-          : ab && E.absHalf(ab) ? '<div class="pc-half">' + esc(absLabel(ab)) + '</div>' : '')
+          : ab && E.absHalf(ab) === 'am' ? '<div class="pc-wabs">' + esc(absLabel(ab)) + '</div><div class="pc-wpart">Après-midi</div>' : '')
           + (cap ? '<div class="pc-wcap" title="' + esc(E.fmtMin(load) + ' planifiées sur ' + E.fmtMin(cap) + ' · ' + f.txt) + '"><span><b>' + E.fmtMin(load) + '</b> / ' + E.fmtMin(cap) + '</span>' + pcBar(f, true) + '</div>' : load ? '' : '<div class="pc-off-l">' + esc(hol ? 'Férié' : ab ? absLabel(ab) : c.kind === 'apprenti' ? 'École' : 'Non travaillé') + '</div>')
-          + ts.slice(0, more > 0 ? max - 1 : max).map(t => pcCard(t, d)).join('') + (more > 0 ? '<button class="pc-more" data-act="teamcell" data-c="' + c.id + '" data-date="' + d + '">+ ' + (more + 1) + ' autres</button>' : '') + '</div>';
+          + (cap && ab && E.absHalf(ab) === 'pm' ? '<div class="pc-wpart">Matin</div>' : '')
+          + ts.slice(0, more > 0 ? max - 1 : max).map(t => pcCard(t, d)).join('') + (more > 0 ? '<button class="pc-more" data-act="teamcell" data-c="' + c.id + '" data-date="' + d + '">+ ' + (more + 1) + ' autres</button>' : '')
+          + (cap && ab && E.absHalf(ab) === 'pm' ? '<div class="pc-wabs pm">' + esc(absLabel(ab)) + '</div>' : '') + '</div>';
       }).join('');
       const f = pcFill(tl, tc);
       return '<div class="pc-wrow"><div class="pc-who">' + pcAv(c) + '<div class="pc-who-t"><b>' + esc(c.name) + (c.id === S.me.collaborator_id ? ' <small>moi</small>' : '') + '</b><span>' + esc(PC_KIND[c.kind] || '') + '</span>' + (tc || tl ? '<span class="pc-who-load"><b>' + E.fmtMin(tl) + '</b> / ' + E.fmtMin(tc) + '</span>' + pcBar(f, true) + '<span class="pc-who-f f-' + f.cls + '">' + esc(f.txt) + '</span>' : '<span class="pc-who-load">Non travaillé cette semaine</span>') + '</div></div>' + cells + '</div>';

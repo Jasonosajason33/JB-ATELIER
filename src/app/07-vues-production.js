@@ -125,8 +125,9 @@
       const n = dayTasks(c.id, d).length, outwin = d < win.start || d > win.end;
       if (!outwin) { tot += l.total; capT += cap; }
       if (from && d < from) continue;
-      const hol = x.settings.holidays && E.holidayName(d);
-      cells += '<div class="mcell cell-' + (cap || l.total ? lv : 'off') + (outwin ? ' outwin' : '') + (d === td ? ' today' : '') + '" data-act="goday" data-date="' + d + '" data-drop="' + d + '" data-dc="' + c.id + '"><div class="dn"><span>' + Number(d.slice(8)) + '</span>' + (hol ? '<span title="' + esc(hol) + '">F</span>' : '') + '</div>'
+      const hol = x.settings.holidays && E.holidayName(d), ab = E.absenceOn(c.id, d, x), h = ab && cap > 0 ? E.absHalf(ab) : ''; // V26.211 : absences grisées
+      cells += '<div class="mcell cell-' + (cap || l.total ? lv : 'off') + (!cap ? ' is-off' : '') + (h ? ' h' + h : '') + (outwin ? ' outwin' : '') + (d === td ? ' today' : '') + '" data-act="goday" data-date="' + d + '" data-drop="' + d + '" data-dc="' + c.id + '"><div class="dn"><span>' + Number(d.slice(8)) + '</span>' + (hol ? '<span title="' + esc(hol) + '">F</span>' : '') + '</div>'
+        + (ab ? '<div class="abs-l">' + esc(absLabel(ab)) + '</div>' : !cap && c.kind === 'apprenti' && !hol ? '<div class="abs-l">École</div>' : '')
         + (l.total ? '<div class="hl">' + E.fmtMin(l.total) + '<span class="hide-m"> / ' + E.fmtMin(cap) + '</span></div><div class="cnt small">' + n + ' tâche' + (n > 1 ? 's' : '') + '</div>' : cap ? '<div class="small muted">libre<span class="hide-m"> · ' + E.fmtMin(cap) + '</span></div>' : '') + '</div>';
     }
     const unpl = list('tasks').filter(t => t.month === m && t.collaborator_id === c.id && !t.done && !t.planned_date);

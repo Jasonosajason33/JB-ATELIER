@@ -246,7 +246,8 @@
       const lanes = [];
       items.forEach(it => { let l = lanes.findIndex(end => end < it.a); if (l < 0) { l = lanes.length; lanes.push(-1); } lanes[l] = it.b; it.l = l; });
       const L = Math.max(1, lanes.length);
-      const bg = dates.map((d, i) => { const cap = E.capacityOn(c, d, x), l = E.loadOf(tasks, c.id, d).total; return '<div class="gbg' + (cap <= 0 ? ' off' : l > cap ? ' over' : '') + (d === td ? ' today' : '') + '" style="grid-column:' + (i + 2) + ';grid-row:1 / span ' + L + '"></div>'; }).join('');
+      const bg = dates.map((d, i) => { const cap = E.capacityOn(c, d, x), l = E.loadOf(tasks, c.id, d).total, ab = E.absenceOn(c.id, d, x), h = ab && cap > 0 ? E.absHalf(ab) : ''; // V26.211 : absences grisées (demi-journée : moitié gauche = matin, droite = après-midi)
+        return '<div class="gbg' + (cap <= 0 ? ' off' : l > cap ? ' over' : '') + (h ? ' h' + h : '') + (d === td ? ' today' : '') + '" style="grid-column:' + (i + 2) + ';grid-row:1 / span ' + L + '"' + (ab ? ' title="' + esc(absLabel(ab)) + '"' : cap <= 0 && c.kind === 'apprenti' ? ' title="École"' : '') + '></div>'; }).join('');
       const bars = items.map(it => {
         const t = it.t, cl = clientOf(t.client_id) || {}, p = S.data.productions.get(t.production_id), late = !t.done && E.endDate(t) < td;
         return '<div class="gbar k-' + t.kind + (t.done ? ' done' : '') + (p && !p.received_date && t.kind !== 'info' ? ' forecast' : '') + (late ? ' late' : '') + '" style="grid-column:' + (it.a + 2) + ' / ' + (it.b + 3) + ';grid-row:' + (it.l + 1) + '" data-act="task" data-id="' + t.id + '" title="' + esc(cl.name + ' — ' + E.KIND_LABEL[t.kind] + ' — ' + E.fmtMin(t.duration_min)) + '"><span>' + (t.kind === 'info' ? ic('mail', 'sm') : '') + esc(cl.name) + '</span><small>' + E.fmtMin(t.duration_min) + '</small></div>';

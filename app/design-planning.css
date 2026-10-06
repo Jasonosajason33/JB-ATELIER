@@ -516,3 +516,15 @@ html[data-cur="noir"] .tasks .swipe > .task:hover { box-shadow: inset 0 0 0 1.5p
 #view .carousel[data-keep="kpi-fil"] > .kpi .v { font-size: 17px !important; }
 #view .carousel[data-keep="kpi-fil"] > .kpi .foot { font-size: 11px; }
 #view .carousel[data-keep="kpi-fil"] > .kpi .foot .delta { padding: 0 6px; font-size: 10.5px; }
+
+/* V26.211 — absences : Semaine (bande matin / après-midi) et Mois (jours grisés, demi-journées à moitié) */
+.pc-wabs { margin: 0 0 6px; padding: 10px 8px; border-radius: 8px; font-size: 11.5px; font-weight: 600; font-style: italic; color: color-mix(in srgb, var(--text) 62%, transparent); background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--text) 10%, transparent) 0 1px, transparent 1px 7px), color-mix(in srgb, var(--text) 11%, transparent); min-height: 56px; display: flex; align-items: center; }
+.pc-wabs.pm { margin: 6px 0 0; }
+.pc-wpart { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 2px 2px 4px; }
+.gantt .gbg.off { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--text) 10%, transparent) 0 1px, transparent 1px 7px), color-mix(in srgb, var(--text) 11%, transparent) !important; }
+.gantt .gbg.ham { background: linear-gradient(90deg, color-mix(in srgb, var(--text) 13%, transparent) 50%, transparent 50%) !important; }
+.gantt .gbg.hpm { background: linear-gradient(90deg, transparent 50%, color-mix(in srgb, var(--text) 13%, transparent) 50%) !important; }
+.month .mcell.is-off { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--text) 10%, transparent) 0 1px, transparent 1px 7px), color-mix(in srgb, var(--text) 11%, transparent) !important; }
+.month .mcell.ham { background-image: linear-gradient(180deg, color-mix(in srgb, var(--text) 12%, transparent) 50%, transparent 50%) !important; }
+.month .mcell.hpm { background-image: linear-gradient(180deg, transparent 50%, color-mix(in srgb, var(--text) 12%, transparent) 50%) !important; }
+.month .mcell .abs-l { font-size: 11px; font-weight: 600; font-style: italic; color: color-mix(in srgb, var(--text) 62%, transparent); line-height: 1.2; }
