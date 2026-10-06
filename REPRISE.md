@@ -8,7 +8,7 @@ Les notes détaillées sont dans le dossier `notes-claude/` (règles de livraiso
 - Sources : `src/app/NN-*.js`, assemblées dans `app/app.js` par `build.ps1` (PC sans Node) ou `build.js`.
 - Démo publiée (données fictives) : https://claude.ai/artifact/PaW1TkQGP4JfcWnmWqchyj — page `pub-demo/jbflow-demo.html`.
 - Tests du moteur : `app/tests/moteur.html` (7 tests, tous verts en 26.216).
-- Dépôt de travail : GitHub « JB-ATELIER » (branche `claude/new-session-hylho7`) contient `app/`, `src/`, `supabase/`, `pub-demo/` et `sim/preview-cards.css`. Le dépôt « JB-FLOW-AUTOMATIC » (mis en ligne par Cloudflare) était resté en 26.45 au 3 octobre.
+- Dépôt de travail : GitHub « JB-ATELIER » (branche `claude/new-session-hylho7`) contient `app/`, `src/`, `supabase/`, `pub-demo/` et `sim/preview-cards.css`. Le dépôt « JB-FLOW-AUTOMATIC » était resté en 26.45, déposé à plat (le build échouait) ; le 6 octobre il a été remis en structure `app/ src/ supabase/` et poussé en 26.216 sur `main`, avec `REPRISE-CLOUD.md` à la racine (fichiers modifiés, migrations, réglages Cloudflare à vérifier : dossier publié `app`).
 - Outils de test automatisés (Edge sans fenêtre) : `sim/build-steps.ps1` + `sim/cdp-steps.ps1` ; aides `sim/crypto-helpers.js`.
 
 ## Règles permanentes
